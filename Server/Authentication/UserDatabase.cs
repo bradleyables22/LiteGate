@@ -8,13 +8,35 @@ namespace Server.Authentication
     public class UserDatabase
     {
         private readonly string _connectionString = "Data Source=data/app.db";
+        private readonly SemaphoreSlim _lock = new(1, 1);
 
-        public async Task<TryResult<bool>> DeleteUserByIdAsync(string userId)
+        public async Task<TryResult<bool>> EnsureWalEnabledAsync()
         {
             try
             {
-                const string sql = "DELETE FROM Users WHERE Id = @UserId";
+                using var conn = new SqliteConnection(_connectionString);
+                await conn.OpenAsync();
 
+                var result = await conn.ExecuteScalarAsync<string>("PRAGMA journal_mode = WAL;");
+                if (!string.Equals(result, "wal", StringComparison.OrdinalIgnoreCase))
+                {
+                    return TryResult<bool>.Fail("Failed to enable WAL mode.", new Exception($"Unexpected journal_mode result: {result}"));
+                }
+
+                return TryResult<bool>.Pass(true);
+            }
+            catch (Exception ex)
+            {
+                return TryResult<bool>.Fail("Exception occurred while enabling WAL mode.", ex);
+            }
+        }
+
+        public async Task<TryResult<bool>> DeleteUserByIdAsync(string userId)
+        {
+            await _lock.WaitAsync();
+            try
+            {
+                const string sql = "DELETE FROM Users WHERE Id = @UserId";
                 using var conn = new SqliteConnection(_connectionString);
                 await conn.OpenAsync();
 
@@ -29,7 +51,12 @@ namespace Server.Authentication
             {
                 return TryResult<bool>.Fail("Failed to delete user.", ex);
             }
+            finally
+            {
+                _lock.Release();
+            }
         }
+
         public async Task<TryResult<AppUser?>> GetUserByIdAsync(string id)
         {
             try
@@ -52,6 +79,7 @@ namespace Server.Authentication
                 return TryResult<AppUser?>.Fail("Failed to fetch user by ID.", ex);
             }
         }
+
         public async Task<OffsetTryResult<AppUser>> GetUsersAsync(long skip, int take)
         {
             try
@@ -79,6 +107,7 @@ namespace Server.Authentication
 
         public async Task<TryResult<bool>> EnsureTablesExistAsync()
         {
+            await _lock.WaitAsync();
             try
             {
                 using var conn = new SqliteConnection(_connectionString);
@@ -102,9 +131,15 @@ namespace Server.Authentication
             {
                 return TryResult<bool>.Fail("Failed to ensure user table exists.", ex);
             }
+            finally
+            {
+                _lock.Release();
+            }
         }
+
         public async Task<TryResult<bool>> ChangePasswordAsync(string userId, string newPlainTextPassword)
         {
+            await _lock.WaitAsync();
             try
             {
                 var newHash = PasswordHasher.HashPassword(newPlainTextPassword);
@@ -129,7 +164,12 @@ namespace Server.Authentication
             {
                 return TryResult<bool>.Fail("Failed to change user password.", ex);
             }
+            finally
+            {
+                _lock.Release();
+            }
         }
+
         public async Task<TryResult<bool>> UserExistsAsync(string userName)
         {
             try
@@ -149,6 +189,7 @@ namespace Server.Authentication
 
         public async Task<TryResult<bool>> CreateUserAsync(AppUser user, string plainTextPassword)
         {
+            await _lock.WaitAsync();
             try
             {
                 user.PasswordHash = PasswordHasher.HashPassword(plainTextPassword);
@@ -169,6 +210,10 @@ namespace Server.Authentication
             catch (Exception ex)
             {
                 return TryResult<bool>.Fail("Failed to create user.", ex);
+            }
+            finally
+            {
+                _lock.Release();
             }
         }
 
@@ -193,8 +238,10 @@ namespace Server.Authentication
                 return TryResult<AppUser?>.Fail("Failed to fetch user.", ex);
             }
         }
+
         public async Task<TryResult<bool>> UpdateUserRolesAsync(string userId, List<DatabaseRole> newRoles)
         {
+            await _lock.WaitAsync();
             try
             {
                 var rolesJson = JsonSerializer.Serialize(newRoles);
@@ -209,6 +256,10 @@ namespace Server.Authentication
             catch (Exception ex)
             {
                 return TryResult<bool>.Fail("Failed to update user roles.", ex);
+            }
+            finally
+            {
+                _lock.Release();
             }
         }
     }
