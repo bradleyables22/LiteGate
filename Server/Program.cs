@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Server.Authentication;
+using Server.Management.User;
 using Server.Services;
 using Server.Transformers;
 using System.Net;
@@ -118,4 +119,6 @@ app.MapScalarApiReference(options =>
     options.WithDarkModeToggle(false);
 });
 app.MapAuthEndpoints();
+app.MapUserManagementEndpoints();
+app.MapUserRoleManagementEndpoints();
 app.Run();

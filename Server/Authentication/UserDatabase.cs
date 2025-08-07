@@ -9,6 +9,74 @@ namespace Server.Authentication
     {
         private readonly string _connectionString = "Data Source=data/app.db";
 
+        public async Task<TryResult<bool>> DeleteUserByIdAsync(string userId)
+        {
+            try
+            {
+                const string sql = "DELETE FROM Users WHERE Id = @UserId";
+
+                using var conn = new SqliteConnection(_connectionString);
+                await conn.OpenAsync();
+
+                var rowsAffected = await conn.ExecuteAsync(sql, new { UserId = userId });
+
+                if (rowsAffected == 0)
+                    return TryResult<bool>.Fail("No user found with the given ID.", new KeyNotFoundException());
+
+                return TryResult<bool>.Pass(true);
+            }
+            catch (Exception ex)
+            {
+                return TryResult<bool>.Fail("Failed to delete user.", ex);
+            }
+        }
+        public async Task<TryResult<AppUser?>> GetUserByIdAsync(string id)
+        {
+            try
+            {
+                const string sql = """
+                    SELECT *
+                    FROM Users
+                    WHERE Id = @Id
+                """;
+
+                using var conn = new SqliteConnection(_connectionString);
+                await conn.OpenAsync();
+
+                var user = await conn.QuerySingleOrDefaultAsync<AppUser>(sql, new { Id = id });
+
+                return TryResult<AppUser?>.Pass(user);
+            }
+            catch (Exception ex)
+            {
+                return TryResult<AppUser?>.Fail("Failed to fetch user by ID.", ex);
+            }
+        }
+        public async Task<OffsetTryResult<AppUser>> GetUsersAsync(long skip, int take)
+        {
+            try
+            {
+                using var conn = new SqliteConnection(_connectionString);
+                await conn.OpenAsync();
+
+                var totalSql = "SELECT COUNT(*) FROM Users;";
+                var totalCount = await conn.ExecuteScalarAsync<int>(totalSql);
+
+                var dataSql = """
+                    SELECT * FROM Users
+                    ORDER BY CreatedAt DESC
+                    LIMIT @Take OFFSET @Skip;
+                """;
+                var users = (await conn.QueryAsync<AppUser>(dataSql, new { Take = take, Skip = skip })).ToList();
+
+                return OffsetTryResult<AppUser>.Pass(totalCount, users);
+            }
+            catch (Exception ex)
+            {
+                return OffsetTryResult<AppUser>.Fail("Failed to pull user table data.", ex);
+            }
+        }
+
         public async Task<TryResult<bool>> EnsureTablesExistAsync()
         {
             try
@@ -35,7 +103,33 @@ namespace Server.Authentication
                 return TryResult<bool>.Fail("Failed to ensure user table exists.", ex);
             }
         }
+        public async Task<TryResult<bool>> ChangePasswordAsync(string userId, string newPlainTextPassword)
+        {
+            try
+            {
+                var newHash = PasswordHasher.HashPassword(newPlainTextPassword);
 
+                const string sql = """
+                    UPDATE Users
+                    SET PasswordHash = @PasswordHash
+                    WHERE Id = @UserId
+                """;
+
+                using var conn = new SqliteConnection(_connectionString);
+                await conn.OpenAsync();
+
+                var rowsAffected = await conn.ExecuteAsync(sql, new { UserId = userId, PasswordHash = newHash });
+
+                if (rowsAffected == 0)
+                    return TryResult<bool>.Fail("User not found or password unchanged.", new Exception("No rows affected."));
+
+                return TryResult<bool>.Pass(true);
+            }
+            catch (Exception ex)
+            {
+                return TryResult<bool>.Fail("Failed to change user password.", ex);
+            }
+        }
         public async Task<TryResult<bool>> UserExistsAsync(string userName)
         {
             try
@@ -99,7 +193,6 @@ namespace Server.Authentication
                 return TryResult<AppUser?>.Fail("Failed to fetch user.", ex);
             }
         }
-
         public async Task<TryResult<bool>> UpdateUserRolesAsync(string userId, List<DatabaseRole> newRoles)
         {
             try

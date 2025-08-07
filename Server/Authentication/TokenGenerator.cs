@@ -29,7 +29,7 @@ namespace Server.Authentication
             var token = handler.CreateToken(new SecurityTokenDescriptor
             {
                 Subject = identity,
-                Expires = DateTime.UtcNow.Add(expires ?? TimeSpan.FromHours(1)),
+                Expires = DateTime.UtcNow.Add(expires ?? TimeSpan.FromMinutes(5)),
                 SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature),
                 Audience = "sqlite.user",
                 Issuer = "sqlite.authentication"

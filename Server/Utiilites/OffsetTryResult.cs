@@ -1,43 +1,51 @@
 ﻿namespace Server.Utiilites
 {
-    public class TryResult<T>
+    public class OffsetTryResult<T>
     {
         [System.Text.Json.Serialization.JsonIgnore]
         public bool Success { get; set; }
-        public T? Data { get; set; }
+        public List<T>? Data { get; set; }
+        public int ItemsCount
+        {
+            get
+            {
+                if (Data is not null && Data.Any())
+                    return Data.Count();
+                return 0;
+            }
+        }
+        public int TotalCount { get; set; }
         [System.Text.Json.Serialization.JsonIgnore]
         public string? Message { get; set; }
-
         [System.Text.Json.Serialization.JsonIgnore]
         public Exception? Exception { get; set; }
 
-        public static TryResult<T> Pass(T data)
+        public static OffsetTryResult<T> Pass(int total, List<T>? data)
         {
-            return new TryResult<T>
+            return new OffsetTryResult<T>
             {
                 Success = true,
                 Data = data,
+                TotalCount = total,
                 Message = null,
-                Exception = default
+                Exception = null
             };
         }
 
-        public static TryResult<T> Fail(string message, Exception exception)
+        public static OffsetTryResult<T> Fail(string message, Exception exception)
         {
-            return new TryResult<T>
+            return new OffsetTryResult<T>
             {
                 Success = false,
-                Data = default,
                 Message = message,
                 Exception = exception
             };
         }
-
         public IResult ToResult()
         {
             if (Success)
             {
-                if (Data is not null)
+                if (Data is not null && Data.Any())
                     return Results.Ok(this);
 
                 return Results.NoContent();
@@ -45,7 +53,7 @@
 
             return Results.Problem(
                 detail: Message,
-                title: "Error",
+                title:"Error",
                 statusCode: StatusCodes.Status500InternalServerError
             );
         }

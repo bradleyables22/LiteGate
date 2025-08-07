@@ -10,21 +10,21 @@ namespace Server.Authentication
 
             var authGroup = app.MapGroup("api/v1/identity").WithTags("Identity");
 
-            authGroup.MapPost("/authenticate", async ([FromBody] UserCredentials credentials,UserDatabase db,ServerSettings settings) =>
+            authGroup.MapPost("/authenticate", async ([FromBody] UserCredentials credentials,UserDatabase _db,ServerSettings _settings) =>
             {
-                var userResult = await db.GetUserByNameAsync(credentials.UserName);
+                var userResult = await _db.GetUserByNameAsync(credentials.UserName);
 
                 if (!userResult.Success)
                     return Results.Unauthorized();
 
-                if (userResult.Data is null || !PasswordHasher.VerifyPassword(credentials.Password,userResult.Data.PasswordHash))
+                if (userResult.Data is null || userResult.Data.DisabledAt is not null || !PasswordHasher.VerifyPassword(credentials.Password,userResult.Data.PasswordHash))
                     return Results.Unauthorized();
-                var token = TokenGenerator.GenerateToken(userResult.Data, settings.Secret);
+                var token = TokenGenerator.GenerateToken(userResult.Data, _settings.Secret);
                 return Results.Text(token);
             })
             .AllowAnonymous()
             .Produces(200)
-
+            .Accepts<UserCredentials>("application/json")
             .WithOpenApi()
             .WithDisplayName("Authenticate")
             .WithName("Authenticate")
