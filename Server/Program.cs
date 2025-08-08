@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Server.Authentication;
+using Server.Management.Server;
 using Server.Management.User;
 using Server.Services;
 using Server.Transformers;
@@ -77,7 +78,10 @@ builder.Services.AddOpenApi("v1", options =>
 
 var app = builder.Build();
 
-Directory.CreateDirectory("Data");
+var home = Environment.GetEnvironmentVariable("HOME") ?? AppContext.BaseDirectory;
+var appPath = Path.Combine("databases", "app");
+var dataDir = Path.Combine(home, appPath);
+Directory.CreateDirectory(dataDir);
 
 using (var scope = app.Services.CreateScope())
 {
@@ -122,4 +126,5 @@ app.MapScalarApiReference(options =>
 app.MapAuthEndpoints();
 app.MapUserManagementEndpoints();
 app.MapUserRoleManagementEndpoints();
+app.MapServerSettingsEndpoints();
 app.Run();

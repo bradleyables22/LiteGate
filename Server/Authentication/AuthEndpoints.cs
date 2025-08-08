@@ -19,7 +19,7 @@ namespace Server.Authentication
 
                 if (userResult.Data is null || userResult.Data.DisabledAt is not null || !PasswordHasher.VerifyPassword(credentials.Password,userResult.Data.PasswordHash))
                     return Results.Unauthorized();
-                var token = TokenGenerator.GenerateToken(userResult.Data, _settings.Secret);
+                var token = TokenGenerator.GenerateToken(userResult.Data, _settings.Secret, TimeSpan.FromMinutes(_settings.TokenExpiryMinutes));
                 return Results.Text(token);
             })
             .AllowAnonymous()

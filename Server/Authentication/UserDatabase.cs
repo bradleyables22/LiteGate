@@ -7,8 +7,18 @@ namespace Server.Authentication
 {
     public class UserDatabase
     {
-        private readonly string _connectionString = "Data Source=data/app.db";
+        private readonly string _connectionString;
         private readonly SemaphoreSlim _lock = new(1, 1);
+
+        public UserDatabase()
+        {
+            var home = Environment.GetEnvironmentVariable("HOME") ?? AppContext.BaseDirectory;
+            var appPath = Path.Combine("databases", "app");
+            var dbPath = Path.Combine(home, appPath, "app.db");
+            Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+            _connectionString = $"Data Source={dbPath}";
+        }
+
 
         public async Task<TryResult<bool>> EnsureWalEnabledAsync()
         {
@@ -256,6 +266,51 @@ namespace Server.Authentication
             catch (Exception ex)
             {
                 return TryResult<bool>.Fail("Failed to update user roles.", ex);
+            }
+            finally
+            {
+                _lock.Release();
+            }
+        }
+
+        public async Task<TryResult<bool>> DisableUserAsync(string userId)
+        {
+            await _lock.WaitAsync();
+            try
+            {
+                var sql = "UPDATE Users SET DisabledAt = @DisabledAt WHERE Id = @UserId";
+
+                using var conn = new SqliteConnection(_connectionString);
+                await conn.OpenAsync();
+                await conn.ExecuteAsync(sql, new { UserId = userId, DisabledAt = DateTime.UtcNow });
+
+                return TryResult<bool>.Pass(true);
+            }
+            catch (Exception ex)
+            {
+                return TryResult<bool>.Fail("Failed to disable user.", ex);
+            }
+            finally
+            {
+                _lock.Release();
+            }
+        }
+        public async Task<TryResult<bool>> EnableUserAsync(string userId)
+        {
+            await _lock.WaitAsync();
+            try
+            {
+                var sql = "UPDATE Users SET DisabledAt = NULL WHERE Id = @UserId";
+
+                using var conn = new SqliteConnection(_connectionString);
+                await conn.OpenAsync();
+                await conn.ExecuteAsync(sql, new { UserId = userId });
+
+                return TryResult<bool>.Pass(true);
+            }
+            catch (Exception ex)
+            {
+                return TryResult<bool>.Fail("Failed to enable user.", ex);
             }
             finally
             {

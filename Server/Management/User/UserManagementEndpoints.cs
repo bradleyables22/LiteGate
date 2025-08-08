@@ -58,7 +58,7 @@ namespace Server.Management.User
                 else
                     return createUserResult.ToResult();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner","*:editor", "app.db:admin", "app.db:owner", "app.db:editor"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "app.db:admin", "app.db:owner"))
             .Produces<AppUser>()
             .Accepts<UserCredentials>("application/json")
             .WithOpenApi()
@@ -68,7 +68,7 @@ namespace Server.Management.User
             .WithSummary("Create User")
             ;
             
-            userGroup.MapPut("/Password", async ([FromBody] PasswordChangeRequest passwordRequest, UserDatabase _db, HttpContext _ctx) =>
+            userGroup.MapPatch("/Password", async ([FromBody] PasswordChangeRequest passwordRequest, UserDatabase _db, HttpContext _ctx) =>
             {
                 var currentUserId = _ctx.User.FindFirst("id")?.Value;
                 if (string.IsNullOrEmpty(currentUserId))
@@ -86,6 +86,62 @@ namespace Server.Management.User
             .WithName("ChangePassword")
             .WithDescription("Change your password")
             .WithSummary("Change Password")
+            ;
+
+            userGroup.MapPatch("/disable/{userId}", async (string userId, UserDatabase _db, HttpContext _ctx) =>
+            {
+                var currentUserId = _ctx.User.FindFirst("id")?.Value;
+
+                if (currentUserId == userId)
+                    return Results.Forbid();
+
+                var disabledResult = await _db.DisableUserAsync(userId);
+
+                if (disabledResult.Success)
+                {
+                    var userResult = await _db.GetUserByIdAsync(userId);
+
+                    return userResult.ToResult();
+                }
+                else
+                    return disabledResult.ToResult();
+
+            })
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "app.db:admin", "app.db:owner"))
+            .Produces<AppUser>()
+            .WithOpenApi()
+            .WithDisplayName("DisableUser")
+            .WithName("DisableUser")
+            .WithDescription("Disable a user")
+            .WithSummary("Disable User")
+            ;
+
+            userGroup.MapPatch("/enable/{userId}", async (string userId, UserDatabase _db, HttpContext _ctx) =>
+            {
+                var currentUserId = _ctx.User.FindFirst("id")?.Value;
+
+                if (currentUserId == userId)
+                    return Results.Forbid();
+
+                var enabledResult = await _db.EnableUserAsync(userId);
+
+                if (enabledResult.Success)
+                {
+                    var userResult = await _db.GetUserByIdAsync(userId);
+
+                    return userResult.ToResult();
+                }
+                else
+                    return enabledResult.ToResult();
+
+            })
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "app.db:admin", "app.db:owner"))
+            .Produces<AppUser>()
+            .WithOpenApi()
+            .WithDisplayName("enableUser")
+            .WithName("enableUser")
+            .WithDescription("Enable a user")
+            .WithSummary("Enable User")
             ;
 
             userGroup.MapDelete("/{id}", async (string id, UserDatabase _db, HttpContext _ctx) =>
