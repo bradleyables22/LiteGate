@@ -93,7 +93,7 @@ namespace Server.Management.Server
             .WithOpenApi()
             .WithDisplayName("DeleteDatabase")
             .WithName("DeleteDatabase")
-            .WithDescription("Delete a database file and its WAL/SHM.")
+            .WithDescription("Delete a database file.")
             .WithSummary("Delete Database");
             return app;
         }

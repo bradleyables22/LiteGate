@@ -7,7 +7,6 @@ using Server.Management.Server;
 using Server.Management.User;
 using Server.Services;
 using Server.Transformers;
-using Server.Utiilites;
 using System.Net;
 using System.Text;
 using System.Threading.RateLimiting;
@@ -73,6 +72,7 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddOpenApi("v1", options =>
 {
+    //this is kind of annoying to have to have, swagger did it better
     options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
     options.AddDocumentTransformer<TitleTransformer>();
 });
@@ -121,8 +121,11 @@ app.MapScalarApiReference(options =>
     options.ForceThemeMode = ThemeMode.Dark;
     options.WithDarkModeToggle(false);
 });
+
 app.MapAuthEndpoints();
 app.MapUserManagementEndpoints();
 app.MapUserRoleManagementEndpoints();
 app.MapServerSettingsEndpoints();
+app.MapDatabaseManagementEndpoints();
+
 app.Run();
