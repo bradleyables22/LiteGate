@@ -1,5 +1,8 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
+﻿using Dapper;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
+using Server.Utiilites;
 
 namespace Server.Management.Server
 {
@@ -42,7 +45,7 @@ namespace Server.Management.Server
             .WithDescription("Download a database file by name.")
             .WithSummary("Download Database");
 
-            databaseGroup.MapPost("/copy/{name}", ([FromRoute] string name, [FromQuery] string newName) =>
+            databaseGroup.MapPut("/copy/{name}", ([FromRoute] string name, [FromQuery] string newName) =>
             {
                 if (name.ToLower() == "app.db" || name.ToLower() == "app")
                     return Results.Forbid();
@@ -66,13 +69,49 @@ namespace Server.Management.Server
 
                     
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "app.db:admin", "app.db:owner"))
             .Produces(200)
             .WithOpenApi()
             .WithDisplayName("CopyDatabase")
             .WithName("CopyDatabase")
             .WithDescription("Copy a database to a new file name.")
             .WithSummary("Copy Database");
+
+            databaseGroup.MapPost("/create/{name}", async ([FromRoute] string name) =>
+            {
+                if (name.ToLower().Contains("."))
+                    return Results.BadRequest("Do not specify filetype");
+                try
+                {
+                    DirectoryManager.ValidateName(name);
+                }
+                catch (Exception)
+                {
+                    return Results.BadRequest("Bad file name");
+                }
+
+                var exists = DirectoryManager.DatabaseFileExists(name);
+                if (exists)
+                    return Results.Conflict("File exists");
+
+                var connectionString = DirectoryManager.BuildSqliteConnectionString(name);
+
+                using var conn = new SqliteConnection(connectionString);
+                await conn.OpenAsync();
+
+                var result = await conn.ExecuteScalarAsync<string>("PRAGMA journal_mode = WAL;");
+                if (!string.Equals(result, "wal", StringComparison.OrdinalIgnoreCase))
+                    return Results.Problem(detail: "Issue activating WAL",title: "Error",statusCode: StatusCodes.Status500InternalServerError);
+
+                return Results.Ok();
+            })
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "app.db:admin", "app.db:owner"))
+            .Produces(200)
+            .WithOpenApi()
+            .WithDisplayName("CreateDatabase")
+            .WithName("CreateDatabase")
+            .WithDescription("Create a database file")
+            .WithSummary("Create Database");
 
             databaseGroup.MapDelete("/{name}", (string name) =>
             {
@@ -88,7 +127,7 @@ namespace Server.Management.Server
                 else
                     return Results.NotFound();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "app.db:admin", "app.db:owner"))
             .Produces(200)
             .WithOpenApi()
             .WithDisplayName("DeleteDatabase")

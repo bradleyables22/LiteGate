@@ -130,7 +130,7 @@ public static class DirectoryManager
         return ms.ToArray();
     }
 
-    private static void ValidateName(string dbName)
+    public static void ValidateName(string dbName)
     {
         if (string.IsNullOrWhiteSpace(dbName))
             throw new ArgumentException("Database name is required.", nameof(dbName));
