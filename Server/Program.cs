@@ -7,6 +7,7 @@ using Server.Management.Server;
 using Server.Management.User;
 using Server.Services;
 using Server.Transformers;
+using Server.Utiilites;
 using System.Net;
 using System.Text;
 using System.Threading.RateLimiting;
@@ -78,10 +79,7 @@ builder.Services.AddOpenApi("v1", options =>
 
 var app = builder.Build();
 
-var home = Environment.GetEnvironmentVariable("HOME") ?? AppContext.BaseDirectory;
-var appPath = Path.Combine("databases", "app");
-var dataDir = Path.Combine(home, appPath);
-Directory.CreateDirectory(dataDir);
+DirectoryManager.EnsureDatabaseFolder("app");
 
 using (var scope = app.Services.CreateScope())
 {

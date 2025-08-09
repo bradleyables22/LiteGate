@@ -12,11 +12,8 @@ namespace Server.Authentication
 
         public UserDatabase()
         {
-            var home = Environment.GetEnvironmentVariable("HOME") ?? AppContext.BaseDirectory;
-            var appPath = Path.Combine("databases", "app");
-            var dbPath = Path.Combine(home, appPath, "app.db");
-            Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
-            _connectionString = $"Data Source={dbPath}";
+            DirectoryManager.EnsureDatabaseFolder("app");
+            _connectionString = DirectoryManager.BuildSqliteConnectionString("app");
         }
 
 
