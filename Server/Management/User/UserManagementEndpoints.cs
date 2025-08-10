@@ -75,8 +75,10 @@ namespace Server.Management.User
                     return Results.Forbid();
 
                 var changeResult = await _db.ChangePasswordAsync(currentUserId,passwordRequest.Password);
-
-                return changeResult.ToResult(); 
+                if (changeResult.Success)
+                    return Results.Ok();
+                else
+                    return changeResult.ToResult(); 
             })
             .RequireAuthorization()
             .Produces<AppUser>()

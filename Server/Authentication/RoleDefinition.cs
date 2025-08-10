@@ -1,4 +1,4 @@
 ﻿namespace Server.Authentication
 {
-    public record RoleDefinition(string Id, string Name);
+    public record RoleDefinition(SystemRole Id, string Name);
 }

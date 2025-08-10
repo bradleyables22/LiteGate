@@ -10,7 +10,7 @@ namespace Server.Management.Server
     {
         public static WebApplication MapDatabaseManagementEndpoints(this WebApplication app) 
         {
-            var databaseGroup = app.MapGroup("api/v1/datbases").WithTags("Database Management");
+            var databaseGroup = app.MapGroup("api/v1/databases").WithTags("Database Management");
 
             databaseGroup.MapGet("", () =>
             {
@@ -44,38 +44,6 @@ namespace Server.Management.Server
             .WithName("DownloadDatabase")
             .WithDescription("Download a database file by name.")
             .WithSummary("Download Database");
-
-            databaseGroup.MapPut("/copy/{name}", ([FromRoute] string name, [FromQuery] string newName) =>
-            {
-                if (name.ToLower() == "app.db" || name.ToLower() == "app")
-                    return Results.Forbid();
-
-                if (name.ToLower() == newName.ToLower())
-                    return Results.BadRequest("Paths cannot match");
-
-                var originalExists = DirectoryManager.DatabaseFileExists(name);
-                
-                if (originalExists)
-                {
-                    var newExists = DirectoryManager.DatabaseFileExists(newName);
-                    if (newExists)
-                        return Results.BadRequest("Directory already exists");
-
-                    DirectoryManager.CopyDatabase(name,newName);
-                    return Results.Ok();
-                }
-                else
-                    return Results.NotFound();
-
-                    
-            })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "app.db:admin", "app.db:owner"))
-            .Produces(200)
-            .WithOpenApi()
-            .WithDisplayName("CopyDatabase")
-            .WithName("CopyDatabase")
-            .WithDescription("Copy a database to a new file name.")
-            .WithSummary("Copy Database");
 
             databaseGroup.MapPost("/create/{name}", async ([FromRoute] string name) =>
             {
@@ -117,6 +85,9 @@ namespace Server.Management.Server
             {
                 if (name.ToLower() == "app.db" || name.ToLower() == "app")
                     return Results.Forbid();
+
+                if (name.ToLower().Contains("."))
+                    return Results.BadRequest("Do not specify filetype");
 
                 var exists = DirectoryManager.DatabaseFileExists(name);
                 if (exists)

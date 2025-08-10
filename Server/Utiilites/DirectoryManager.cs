@@ -47,7 +47,7 @@ public static class DirectoryManager
             if (!SafeName.IsMatch(name)) continue;
 
             var dbFile = Path.Combine(dir, $"{name}.db");
-            if (File.Exists(dbFile)) names.Add(name);
+            if (File.Exists(dbFile)) names.Add($"{name}.db");
         }
         return names;
     }
@@ -61,29 +61,6 @@ public static class DirectoryManager
         return true;
     }
 
-    public static void CopyDatabase(string sourceName, string destName, bool overwrite = false)
-    {
-        var src = GetDatabaseFolder(sourceName);
-        if (!Directory.Exists(src))
-            throw new DirectoryNotFoundException($"Source database folder not found: {src}");
-
-        var dst = GetDatabaseFolder(destName);
-
-        if (Directory.Exists(dst))
-        {
-            if (!overwrite)
-                throw new IOException($"Destination exists: {dst}");
-            Directory.Delete(dst, recursive: true);
-        }
-
-        Directory.CreateDirectory(dst);
-
-        foreach (var file in Directory.EnumerateFiles(src))
-        {
-            var destFile = Path.Combine(dst, Path.GetFileName(file));
-            File.Copy(file, destFile, overwrite: true);
-        }
-    }
     public static bool DatabaseFileExists(string databaseName)
     {
         if (string.IsNullOrWhiteSpace(databaseName))
@@ -97,8 +74,11 @@ public static class DirectoryManager
 
         return File.Exists(path);
     }
+
     public static async Task<byte[]> GetDatabaseBytesAsync(string dbName)
     {
+        dbName = dbName.Replace(".db","");
+
         var dbFile = GetDatabaseFile(dbName);
         if (!File.Exists(dbFile))
             throw new FileNotFoundException("Database file not found.", dbFile);
@@ -106,27 +86,6 @@ public static class DirectoryManager
         await using var fs = new FileStream(dbFile, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
         using var ms = new MemoryStream();
         await fs.CopyToAsync(ms);
-        return ms.ToArray();
-    }
-
-    public static byte[] GetDatabaseZip(string dbName)
-    {
-        var folder = GetDatabaseFolder(dbName);
-        if (!Directory.Exists(folder))
-            throw new DirectoryNotFoundException($"Database folder not found: {folder}");
-
-        using var ms = new MemoryStream();
-        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
-        {
-            foreach (var filePath in Directory.EnumerateFiles(folder))
-            {
-                var entryName = Path.GetFileName(filePath);
-                var entry = zip.CreateEntry(entryName, CompressionLevel.Optimal);
-                using var entryStream = entry.Open();
-                using var fileStream = File.OpenRead(filePath);
-                fileStream.CopyTo(entryStream);
-            }
-        }
         return ms.ToArray();
     }
 

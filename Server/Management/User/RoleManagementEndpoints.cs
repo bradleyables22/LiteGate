@@ -17,7 +17,7 @@ namespace Server.Management.User
             {
                 var roles = Enum.GetValues<SystemRole>()
                     .Select(role => new RoleDefinition(
-                        Id: role.ToString(),
+                        Id: role,
                         Name: System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(role.ToString())
                     ));
 
@@ -42,11 +42,27 @@ namespace Server.Management.User
                 if (userResult.Data is null)
                     return Results.NotFound();
 
+                foreach (var role in roles)
+                {
+                    if (role.Database != "*")
+                    {
+                        if (!role.Database.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
+                            role.Database += ".db";
+
+                        var exists = DirectoryManager.DatabaseFileExists(role.Database);
+                        if (!exists)
+                            return Results.BadRequest($"{role.Database} does not exist");
+                    }
+                }
 
                 var result = await _db.UpdateUserRolesAsync(userId, roles);
 
-                if (result.Success && result.Data == true)
-                    return Results.Ok(userResult.Data);
+                if (result.Success && result.Data == true) 
+                {
+                    var latest = await _db.GetUserByIdAsync(userId);
+
+                    return latest.ToResult();   
+                }
 
                 return result.ToResult();
             })
@@ -72,6 +88,16 @@ namespace Server.Management.User
 
                 if (userResult.Data.Roles is null)
                     userResult.Data.Roles = new();
+
+                if (role.Database != "*")
+                {
+                    var databaseExists = DirectoryManager.DatabaseFileExists(role.Database);
+                    if (!databaseExists)
+                        return Results.BadRequest("Database doesn't exist");
+
+                    if (!role.Database.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
+                        role.Database += ".db";
+                }
 
                 var existingRole = userResult.Data.Roles.Where(x => x.Database == role.Database && x.Role == role.Role).FirstOrDefault();
 
@@ -114,10 +140,15 @@ namespace Server.Management.User
                 if (existingRole is null)
                     return Results.NotFound();
 
+                userResult.Data.Roles.Remove(existingRole);
+
                 var result = await _db.UpdateUserRolesAsync(userId, userResult.Data.Roles);
 
-                if (result.Success && result.Data == true)
-                    return Results.Ok(userResult.Data);
+                if (result.Success && result.Data == true) 
+                {
+                    var latest = await _db.GetUserByIdAsync(userId);
+                    return latest.ToResult();
+                }
 
                 return result.ToResult();
 
@@ -146,7 +177,10 @@ namespace Server.Management.User
 
                 var result = await _db.UpdateUserRolesAsync(userId, userResult.Data.Roles);
                 if (result.Success && result.Data == true)
-                    return Results.Ok(userResult.Data);
+                {
+                    var latest = await _db.GetUserByIdAsync(userId);
+                    return latest.ToResult();
+                }
 
                 return result.ToResult();
             })
