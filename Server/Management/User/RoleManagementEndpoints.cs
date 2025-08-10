@@ -11,7 +11,7 @@ namespace Server.Management.User
     {
         public static WebApplication MapUserRoleManagementEndpoints(this WebApplication app)
         {
-            var roleGroup = app.MapGroup("api/v1/roles").WithTags("Role Management");
+            var roleGroup = app.MapGroup("api/v1/rolemanagement").WithTags("Role Management");
 
             roleGroup.MapGet("/available", (UserDatabase _db) =>
             {

@@ -1,9 +1,10 @@
 ﻿using Dapper;
 using Microsoft.Data.Sqlite;
+using Server.Authentication;
 using Server.Utiilites;
 using System.Text.Json;
 
-namespace Server.Authentication
+namespace Server.Services
 {
     public class UserDatabase
     {

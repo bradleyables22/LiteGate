@@ -10,7 +10,7 @@ namespace Server.Management.Server
     {
         public static WebApplication MapDatabaseManagementEndpoints(this WebApplication app) 
         {
-            var databaseGroup = app.MapGroup("api/v1/databases").WithTags("Database Management");
+            var databaseGroup = app.MapGroup("api/v1/databasemanagement").WithTags("Database Management");
 
             databaseGroup.MapGet("", () =>
             {

@@ -7,7 +7,7 @@ namespace Server.Management.Server
         public static WebApplication MapServerSettingsEndpoints(this WebApplication app) 
         {
 
-            var settingsGroup = app.MapGroup("api/v1/settings").WithTags("Settings Management");
+            var settingsGroup = app.MapGroup("api/v1/server management").WithTags("Server Management");
 
             settingsGroup.MapPatch("/change/secret", (ServerSettings _st) =>
             {

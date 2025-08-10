@@ -9,7 +9,7 @@ namespace Server.Management.User
     {
         public static WebApplication MapUserManagementEndpoints(this WebApplication app) 
         {
-            var userGroup = app.MapGroup("api/v1/users").WithTags("User Management");
+            var userGroup = app.MapGroup("api/v1/usermanagement").WithTags("User Management");
 
             userGroup.MapGet("", async (UserDatabase _db, long skip = 0, int take = 10) =>
             {
