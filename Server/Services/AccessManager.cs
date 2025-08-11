@@ -52,7 +52,7 @@ namespace Server.Services
                 if (accessLevels == null || !accessLevels.Any())
                     return allowed;
 
-				allowed = accessLevels.Where(x => x == SystemRole.owner.ToString() || x == SystemRole.admin.ToString() || x == SystemRole.editor.ToString()).Any();
+				allowed = accessLevels.Where(x => x == SystemRole.admin.ToString() || x == SystemRole.editor.ToString()).Any();
 
                 return allowed;
 			}
@@ -148,7 +148,7 @@ namespace Server.Services
                     return SystemRole.viewer;
 
                 if (ContainsAnyPair(t, SchemaPairs))
-                    return SystemRole.owner;
+                    return SystemRole.admin;
 
                 if (ContainsAny(WriteSingles, t))
                     return SystemRole.editor;
