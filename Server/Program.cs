@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Server.Authentication;
+using Server.Hubs;
 using Server.Management.Server;
 using Server.Management.User;
 using Server.Services;
@@ -14,9 +15,10 @@ using System.Threading.RateLimiting;
 var builder = WebApplication.CreateBuilder(args);
 
 SQLitePCL.Batteries.Init();
+
 builder.Services.AddSingleton<UserDatabase>();
 builder.Services.AddSingleton<ServerSettings>();
-
+builder.Services.AddSignalR();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -41,16 +43,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             }
         };
     });
+
 builder.Services.AddAuthorization();
 
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
+    options.AddPolicy("all",
+        builder =>
+        {
+            builder.AllowAnyOrigin();
+            builder.AllowAnyHeader();
+            builder.AllowAnyMethod();
+            builder.WithExposedHeaders("X-Auth-Info", "X-Auth-Identity", "X-Auth-Error", "X-Auth-Identity-WebAlerts");
+        });
+
 });
 
 builder.Services.AddRateLimiter(options =>
@@ -84,6 +90,7 @@ DirectoryManager.EnsureDatabaseFolder("app");
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<UserDatabase>();
+    
     await db.EnsureTablesExistAsync();
     await db.EnsureWalEnabledAsync();
     const string defaultUserName = "SuperAdmin";
@@ -103,12 +110,13 @@ using (var scope = app.Services.CreateScope())
         };
         await db.CreateUserAsync(user, defaultPassword);
     }
+
 }
 
 app.UseHsts();
 app.UseHttpsRedirection();
 app.UseRateLimiter();
-app.UseCors();
+app.UseCors("all");
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -127,5 +135,11 @@ app.MapUserManagementEndpoints();
 app.MapUserRoleManagementEndpoints();
 app.MapServerSettingsEndpoints();
 app.MapDatabaseManagementEndpoints();
+
+app.MapHub<DatabaseHub>("/hubs/v1/database", options =>
+{
+    options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
+    options.CloseOnAuthenticationExpiration = true;
+});
 
 app.Run();
