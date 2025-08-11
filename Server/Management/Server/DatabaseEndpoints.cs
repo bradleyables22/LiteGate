@@ -16,7 +16,7 @@ namespace Server.Management.Server
             {
                 return Results.Ok(DirectoryManager.ListDatabases());
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "*:editor", "*:viewer", "app.db:admin", "app.db:owner", "app.db:editor", "app.db:viewer"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:editor", "*:viewer", "app.db:admin", "app.db:editor", "app.db:viewer"))
             .Produces<IReadOnlyList<string>>(200)
             .WithOpenApi()
             .WithDisplayName("ListDatabases")
@@ -37,7 +37,7 @@ namespace Server.Management.Server
                     return Results.NotFound();
                     
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "*:editor", "*:viewer", "app.db:admin", "app.db:owner", "app.db:editor", "app.db:viewer"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:editor", "*:viewer", "app.db:admin", "app.db:editor", "app.db:viewer"))
             .Produces<FileContentResult>(200)
             .WithOpenApi()
             .WithDisplayName("DownloadDatabase")
@@ -73,7 +73,7 @@ namespace Server.Management.Server
 
                 return Results.Ok();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "app.db:admin", "app.db:owner"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin","app.db:admin"))
             .Produces(200)
             .WithOpenApi()
             .WithDisplayName("CreateDatabase")
@@ -98,7 +98,7 @@ namespace Server.Management.Server
                 else
                     return Results.NotFound();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "app.db:admin", "app.db:owner"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
             .Produces(200)
             .WithOpenApi()
             .WithDisplayName("DeleteDatabase")

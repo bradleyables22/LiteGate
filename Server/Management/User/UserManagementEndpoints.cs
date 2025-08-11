@@ -17,7 +17,7 @@ namespace Server.Management.User
 
                 return usersResult.ToResult();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "*:editor", "*:viewer", "app.db:admin", "app.db:owner", "app.db:editor", "app.db:viewer"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:editor", "*:viewer", "app.db:admin", "app.db:editor", "app.db:viewer"))
             .Produces(200)
             .Accepts<OffsetTryResult<AppUser>>("application/json")
             .WithOpenApi()
@@ -33,7 +33,7 @@ namespace Server.Management.User
 
                 return usersResult.ToResult();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "*:editor","*:viewer", "app.db:admin", "app.db:owner", "app.db:editor","app.db:viewer"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:editor","*:viewer", "app.db:admin", "app.db:editor","app.db:viewer"))
             .Produces(200)
             .Accepts<AppUser>("application/json")
             .WithOpenApi()
@@ -58,7 +58,7 @@ namespace Server.Management.User
                 else
                     return createUserResult.ToResult();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "app.db:admin", "app.db:owner"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
             .Produces<AppUser>()
             .Accepts<UserCredentials>("application/json")
             .WithOpenApi()
@@ -109,7 +109,7 @@ namespace Server.Management.User
                     return disabledResult.ToResult();
 
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "app.db:admin", "app.db:owner"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
             .Produces<AppUser>()
             .WithOpenApi()
             .WithDisplayName("DisableUser")
@@ -137,7 +137,7 @@ namespace Server.Management.User
                     return enabledResult.ToResult();
 
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "app.db:admin", "app.db:owner"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
             .Produces<AppUser>()
             .WithOpenApi()
             .WithDisplayName("enableUser")
@@ -156,7 +156,7 @@ namespace Server.Management.User
                 var deleteResult = await _db.DeleteUserByIdAsync(id);
                 return deleteResult.ToResult();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:owner", "app.db:admin", "app.db:owner"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
             .Produces(200)
             .WithOpenApi()
             .WithDisplayName("DeleteUser")

@@ -37,7 +37,7 @@ namespace Server.Authentication
 
     public enum SystemRole
     {
-        admin,owner,editor,viewer
+        admin,editor,viewer
     }
 }
 
