@@ -28,11 +28,17 @@ public static class DirectoryManager
         Directory.CreateDirectory(folder);
     }
 
-    public static string BuildSqliteConnectionString(string dbName)
+    public static string BuildSqliteConnectionString(string dbName, bool readOnly = false)
     {
         EnsureDatabaseFolder(dbName);
         var dbPath = GetDatabaseFile(dbName);
-        return $"Data Source={dbPath};Default Timeout=5;";
+
+        var baseConn = $"Data Source={dbPath};Default Timeout=5;";
+
+        if (readOnly)
+            baseConn += "Mode=ReadOnly;Cache=Shared;";
+        
+        return baseConn;
     }
 
     public static IReadOnlyList<string> ListDatabases()

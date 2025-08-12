@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace Server.Authentication
+namespace Server.Authentication.Models
 {
     public class PasswordChangeRequest
     {

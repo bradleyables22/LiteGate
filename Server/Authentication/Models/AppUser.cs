@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 
-namespace Server.Authentication
+namespace Server.Authentication.Models
 {
     public class AppUser
     {

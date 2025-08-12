@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Server.Authentication;
+using Server.Authentication.Models;
 using Server.Services;
 using Server.Utiilites;
 

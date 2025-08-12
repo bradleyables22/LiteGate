@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Server.Authentication;
+using Server.Authentication.Models;
 using Server.Hubs;
 using Server.Management.Server;
 using Server.Management.User;

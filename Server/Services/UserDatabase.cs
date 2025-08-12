@@ -1,6 +1,7 @@
 ﻿using Dapper;
 using Microsoft.Data.Sqlite;
 using Server.Authentication;
+using Server.Authentication.Models;
 using Server.Utiilites;
 using System.Text.Json;
 
@@ -212,7 +213,6 @@ namespace Server.Services
                 using var conn = new SqliteConnection(_connectionString);
                 await conn.OpenAsync();
                 await conn.ExecuteAsync(sql, user);
-
                 return TryResult<bool>.Pass(true);
             }
             catch (Exception ex)

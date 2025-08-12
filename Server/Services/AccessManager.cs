@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR;
-using Server.Authentication;
+using Server.Authentication.Models;
 using System.Security.Claims;
 
 namespace Server.Services
@@ -70,7 +70,7 @@ namespace Server.Services
 				if (Convert.ToBoolean(context.User?.Identity?.IsAuthenticated) == false)
 					return allowedRoles;
 
-				var roles = context.User.Claims.Where(x => x.Type == ClaimTypes.Role).Where(x => x.Value.Contains(db.ToLower())).ToList();
+				var roles = context.User.Claims.Where(x => x.Type == ClaimTypes.Role).Where(x => x.Value.Contains(db.ToLower()) || x.Value.Contains("*")).ToList();
 
 				if (roles == null || !roles.Any())
 					return allowedRoles;
