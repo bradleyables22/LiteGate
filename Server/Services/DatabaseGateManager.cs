@@ -36,6 +36,7 @@ namespace Server.Services
                 cmd.CommandTimeout = Convert.ToInt32(request.Timeout);
 
                 var rows = await cmd.ExecuteNonQueryAsync(ct);
+                
                 await tx.CommitAsync(ct);
 
                 if (rows == -1)

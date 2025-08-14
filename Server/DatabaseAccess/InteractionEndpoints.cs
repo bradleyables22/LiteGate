@@ -10,16 +10,23 @@ namespace Server.DatabaseAccess
         {
             var databaseGroup = app.MapGroup("api/v1/database").WithTags("Database Interaction");
 
-            databaseGroup.MapPost("/execute/{name}", async (DatabaseGateManager _gateManager, HttpContext _context,[FromRoute] string name, [FromHeader] int timeout = 30) =>
+            databaseGroup.MapPost("/execute/raw/{name}", async (DatabaseGateManager _gateManager, HttpContext _context,[FromRoute] string name, [FromHeader] int timeout = 30) =>
             {
-                //if (name.ToLower() == "app")
-                //    return Results.Forbid();
+                if (string.IsNullOrEmpty(name))
+                    return Results.BadRequest("Invalid name");
+
+                if (name.ToLower().Contains("."))
+                    return Results.BadRequest("Do not specify filetype");
+
+                if (name.ToLower() == "app")
+                    return Results.Forbid();
 
                 using var reader = new StreamReader(_context.Request.Body);
                 string sql = await reader.ReadToEndAsync();
 
-                if (name.ToLower().Contains("."))
-                    return Results.BadRequest("Do not specify filetype");
+                if (string.IsNullOrEmpty(sql))
+                    return Results.BadRequest("No SQL statement found");
+
                 try
                 {
                     DirectoryManager.ValidateName(name);
@@ -70,14 +77,23 @@ namespace Server.DatabaseAccess
                 .WithDescription("Execute a command to a database")
                 .WithSummary("Execute");
 
-            databaseGroup.MapPost("/query/{name}", async (DatabaseGateManager _gateManager, HttpContext _context, [FromRoute] string name, [FromHeader] int timeout = 30) =>
+            databaseGroup.MapPost("/query/raw/{name}", async (DatabaseGateManager _gateManager, HttpContext _context, [FromRoute] string name, [FromHeader] int timeout = 30) =>
             {
+                if (string.IsNullOrEmpty(name))
+                    return Results.BadRequest("Invalid name");
+
+                if (name.ToLower().Contains("."))
+                    return Results.BadRequest("Do not specify filetype");
+
+                if (name.ToLower() == "app")
+                    return Results.Forbid();
 
                 using var reader = new StreamReader(_context.Request.Body);
                 string sql = await reader.ReadToEndAsync();
 
-                if (name.ToLower().Contains("."))
-                    return Results.BadRequest("Do not specify filetype");
+                if (string.IsNullOrEmpty(sql))
+                    return Results.BadRequest("No SQL statement found");
+
                 try
                 {
                     DirectoryManager.ValidateName(name);
