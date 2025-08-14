@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using Server.Authentication;
 using Server.Authentication.Models;
 using Server.Utiilites;
+using System.Globalization;
 using System.Text.Json;
 
 namespace Server.Services
@@ -18,19 +19,18 @@ namespace Server.Services
             _connectionString = DirectoryManager.BuildSqliteConnectionString("app");
         }
 
-
-        public async Task<TryResult<bool>> EnsureWalEnabledAsync()
+        public async Task<TryResult<bool>> EnsureWalEnabledAsync(CancellationToken ct = default)
         {
             try
             {
                 using var conn = new SqliteConnection(_connectionString);
-                await conn.OpenAsync();
+                await conn.OpenAsync(ct);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "PRAGMA journal_mode = WAL;";
+                var result = (await cmd.ExecuteScalarAsync(ct))?.ToString();
 
-                var result = await conn.ExecuteScalarAsync<string>("PRAGMA journal_mode = WAL;");
                 if (!string.Equals(result, "wal", StringComparison.OrdinalIgnoreCase))
-                {
                     return TryResult<bool>.Fail("Failed to enable WAL mode.", new Exception($"Unexpected journal_mode result: {result}"));
-                }
 
                 return TryResult<bool>.Pass(true);
             }
@@ -40,18 +40,19 @@ namespace Server.Services
             }
         }
 
-        public async Task<TryResult<bool>> DeleteUserByIdAsync(string userId)
+        public async Task<TryResult<bool>> DeleteUserByIdAsync(string userId, CancellationToken ct = default)
         {
             await _lock.WaitAsync();
             try
             {
-                const string sql = "DELETE FROM Users WHERE Id = @UserId";
                 using var conn = new SqliteConnection(_connectionString);
-                await conn.OpenAsync();
+                await conn.OpenAsync(ct);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "DELETE FROM Users WHERE Id = @UserId";
+                cmd.Parameters.AddWithValue("@UserId", userId);
+                var rows = await cmd.ExecuteNonQueryAsync(ct);
 
-                var rowsAffected = await conn.ExecuteAsync(sql, new { UserId = userId });
-
-                if (rowsAffected == 0)
+                if (rows == 0)
                     return TryResult<bool>.Fail("No user found with the given ID.", new KeyNotFoundException());
 
                 return TryResult<bool>.Pass(true);
@@ -66,22 +67,21 @@ namespace Server.Services
             }
         }
 
-        public async Task<TryResult<AppUser?>> GetUserByIdAsync(string id)
+        public async Task<TryResult<AppUser?>> GetUserByIdAsync(string id, CancellationToken ct = default)
         {
             try
             {
-                const string sql = """
-                    SELECT *
-                    FROM Users
-                    WHERE Id = @Id
-                """;
-
                 using var conn = new SqliteConnection(_connectionString);
-                await conn.OpenAsync();
+                await conn.OpenAsync(ct);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT * FROM Users WHERE Id = @Id";
+                cmd.Parameters.AddWithValue("@Id", id);
 
-                var user = await conn.QuerySingleOrDefaultAsync<AppUser>(sql, new { Id = id });
+                using var reader = await cmd.ExecuteReaderAsync(ct);
+                if (await reader.ReadAsync(ct))
+                    return TryResult<AppUser?>.Pass(MapUser(reader));
 
-                return TryResult<AppUser?>.Pass(user);
+                return TryResult<AppUser?>.Pass(null);
             }
             catch (Exception ex)
             {
@@ -89,22 +89,31 @@ namespace Server.Services
             }
         }
 
-        public async Task<OffsetTryResult<AppUser>> GetUsersAsync(long skip, int take)
+        public async Task<OffsetTryResult<AppUser>> GetUsersAsync(long skip, int take, CancellationToken ct = default)
         {
             try
             {
                 using var conn = new SqliteConnection(_connectionString);
-                await conn.OpenAsync();
+                await conn.OpenAsync(ct);
 
-                var totalSql = "SELECT COUNT(*) FROM Users;";
-                var totalCount = await conn.ExecuteScalarAsync<int>(totalSql);
+                int totalCount;
+                using (var countCmd = conn.CreateCommand())
+                {
+                    countCmd.CommandText = "SELECT COUNT(*) FROM Users;";
+                    totalCount = Convert.ToInt32(await countCmd.ExecuteScalarAsync(ct));
+                }
 
-                var dataSql = """
-                    SELECT * FROM Users
-                    ORDER BY CreatedAt DESC
-                    LIMIT @Take OFFSET @Skip;
-                """;
-                var users = (await conn.QueryAsync<AppUser>(dataSql, new { Take = take, Skip = skip })).ToList();
+                var users = new List<AppUser>();
+                using (var dataCmd = conn.CreateCommand())
+                {
+                    dataCmd.CommandText = "SELECT * FROM Users ORDER BY CreatedAt DESC LIMIT $Take OFFSET $Skip;";
+                    dataCmd.Parameters.AddWithValue("$Take", take);
+                    dataCmd.Parameters.AddWithValue("$Skip", skip);
+
+                    using var reader = await dataCmd.ExecuteReaderAsync(ct);
+                    while (await reader.ReadAsync(ct))
+                        users.Add(MapUser(reader));
+                }
 
                 return OffsetTryResult<AppUser>.Pass(totalCount, users);
             }
@@ -114,15 +123,15 @@ namespace Server.Services
             }
         }
 
-        public async Task<TryResult<bool>> EnsureTablesExistAsync()
+        public async Task<TryResult<bool>> EnsureTablesExistAsync(CancellationToken ct = default)
         {
             await _lock.WaitAsync();
             try
             {
                 using var conn = new SqliteConnection(_connectionString);
-                await conn.OpenAsync();
-
-                var sql = """
+                await conn.OpenAsync(ct);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = """
                     CREATE TABLE IF NOT EXISTS Users (
                         Id TEXT PRIMARY KEY,
                         UserName TEXT NOT NULL UNIQUE,
@@ -132,8 +141,7 @@ namespace Server.Services
                         RolesJson TEXT NOT NULL
                     );
                 """;
-
-                await conn.ExecuteAsync(sql);
+                await cmd.ExecuteNonQueryAsync(ct);
                 return TryResult<bool>.Pass(true);
             }
             catch (Exception ex)
@@ -146,25 +154,21 @@ namespace Server.Services
             }
         }
 
-        public async Task<TryResult<bool>> ChangePasswordAsync(string userId, string newPlainTextPassword)
+        public async Task<TryResult<bool>> ChangePasswordAsync(string userId, string newPlainTextPassword, CancellationToken ct = default)
         {
             await _lock.WaitAsync();
             try
             {
                 var newHash = PasswordHasher.HashPassword(newPlainTextPassword);
-
-                const string sql = """
-                    UPDATE Users
-                    SET PasswordHash = @PasswordHash
-                    WHERE Id = @UserId
-                """;
-
                 using var conn = new SqliteConnection(_connectionString);
-                await conn.OpenAsync();
+                await conn.OpenAsync(ct);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "UPDATE Users SET PasswordHash = @PasswordHash WHERE Id = @UserId";
+                cmd.Parameters.AddWithValue("@PasswordHash", newHash);
+                cmd.Parameters.AddWithValue("@UserId", userId);
 
-                var rowsAffected = await conn.ExecuteAsync(sql, new { UserId = userId, PasswordHash = newHash });
-
-                if (rowsAffected == 0)
+                var rows = await cmd.ExecuteNonQueryAsync(ct);
+                if (rows == 0)
                     return TryResult<bool>.Fail("User not found or password unchanged.", new Exception("No rows affected."));
 
                 return TryResult<bool>.Pass(true);
@@ -178,16 +182,18 @@ namespace Server.Services
                 _lock.Release();
             }
         }
-
-        public async Task<TryResult<bool>> UserExistsAsync(string userName)
+      
+        public async Task<TryResult<bool>> UserExistsAsync(string userName, CancellationToken ct = default)
         {
             try
             {
                 using var conn = new SqliteConnection(_connectionString);
-                await conn.OpenAsync();
+                await conn.OpenAsync(ct);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT COUNT(*) FROM Users WHERE LOWER(UserName) = LOWER(@User)";
+                cmd.Parameters.AddWithValue("@User", userName);
 
-                var sql = "SELECT COUNT(*) FROM Users WHERE LOWER(UserName) = LOWER(@User)";
-                var count = await conn.ExecuteScalarAsync<long>(sql, new { User = userName });
+                var count = Convert.ToInt64(await cmd.ExecuteScalarAsync(ct));
                 return TryResult<bool>.Pass(count > 0);
             }
             catch (Exception ex)
@@ -195,8 +201,8 @@ namespace Server.Services
                 return TryResult<bool>.Fail("Failed to check if user exists.", ex);
             }
         }
-
-        public async Task<TryResult<bool>> CreateUserAsync(AppUser user, string plainTextPassword)
+       
+        public async Task<TryResult<bool>> CreateUserAsync(AppUser user, string plainTextPassword, CancellationToken ct = default)
         {
             await _lock.WaitAsync();
             try
@@ -205,14 +211,20 @@ namespace Server.Services
                 user.CreatedAt = DateTime.UtcNow;
                 user.RolesJson = JsonSerializer.Serialize(user.Roles);
 
-                const string sql = """
-                    INSERT INTO Users (Id, UserName, PasswordHash, CreatedAt, DisabledAt, RolesJson)
-                    VALUES (@Id, @UserName, @PasswordHash, @CreatedAt, @DisabledAt, @RolesJson);
-                """;
-
                 using var conn = new SqliteConnection(_connectionString);
                 await conn.OpenAsync();
-                await conn.ExecuteAsync(sql, user);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = """
+                    INSERT INTO Users (Id, UserName, PasswordHash, CreatedAt, RolesJson)
+                    VALUES (@Id, @UserName, @PasswordHash, @CreatedAt, @RolesJson);
+                """;
+                cmd.Parameters.AddWithValue("@Id", user.Id);
+                cmd.Parameters.AddWithValue("@UserName", user.UserName);
+                cmd.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
+                cmd.Parameters.AddWithValue("@CreatedAt", user.CreatedAt.ToUniversalTime().ToString("o"));
+                cmd.Parameters.AddWithValue("@RolesJson", user.RolesJson);
+
+                await cmd.ExecuteNonQueryAsync();
                 return TryResult<bool>.Pass(true);
             }
             catch (Exception ex)
@@ -224,41 +236,42 @@ namespace Server.Services
                 _lock.Release();
             }
         }
-
-        public async Task<TryResult<AppUser?>> GetUserByNameAsync(string userName)
+       
+        public async Task<TryResult<AppUser?>> GetUserByNameAsync(string userName, CancellationToken ct = default)
         {
             try
             {
-                const string sql = """
-                    SELECT Id, UserName, PasswordHash, CreatedAt, DisabledAt, RolesJson
-                    FROM Users
-                    WHERE LOWER(UserName) = LOWER(@User)
-                """;
-
                 using var conn = new SqliteConnection(_connectionString);
-                await conn.OpenAsync();
+                await conn.OpenAsync(ct);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT * FROM Users WHERE LOWER(UserName) = LOWER(@User)";
+                cmd.Parameters.AddWithValue("@User", userName);
 
-                var result = await conn.QuerySingleOrDefaultAsync<AppUser>(sql, new { User = userName });
-                return TryResult<AppUser?>.Pass(result);
+                using var reader = await cmd.ExecuteReaderAsync(ct);
+                if (await reader.ReadAsync())
+                    return TryResult<AppUser?>.Pass(MapUser(reader));
+
+                return TryResult<AppUser?>.Pass(null);
             }
             catch (Exception ex)
             {
                 return TryResult<AppUser?>.Fail("Failed to fetch user.", ex);
             }
         }
-
-        public async Task<TryResult<bool>> UpdateUserRolesAsync(string userId, List<DatabaseRole> newRoles)
+        
+        public async Task<TryResult<bool>> UpdateUserRolesAsync(string userId, List<DatabaseRole> newRoles, CancellationToken ct = default)
         {
             await _lock.WaitAsync();
             try
             {
                 var rolesJson = JsonSerializer.Serialize(newRoles);
-                var sql = "UPDATE Users SET RolesJson = @RolesJson WHERE Id = @UserId";
-
                 using var conn = new SqliteConnection(_connectionString);
-                await conn.OpenAsync();
-                await conn.ExecuteAsync(sql, new { UserId = userId, RolesJson = rolesJson });
-
+                await conn.OpenAsync(ct);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "UPDATE Users SET RolesJson = @RolesJson WHERE Id = @UserId";
+                cmd.Parameters.AddWithValue("@RolesJson", rolesJson);
+                cmd.Parameters.AddWithValue("@UserId", userId);
+                await cmd.ExecuteNonQueryAsync(ct);
                 return TryResult<bool>.Pass(true);
             }
             catch (Exception ex)
@@ -270,18 +283,19 @@ namespace Server.Services
                 _lock.Release();
             }
         }
-
-        public async Task<TryResult<bool>> DisableUserAsync(string userId)
+       
+        public async Task<TryResult<bool>> DisableUserAsync(string userId, CancellationToken ct = default)
         {
             await _lock.WaitAsync();
             try
             {
-                var sql = "UPDATE Users SET DisabledAt = @DisabledAt WHERE Id = @UserId";
-
                 using var conn = new SqliteConnection(_connectionString);
-                await conn.OpenAsync();
-                await conn.ExecuteAsync(sql, new { UserId = userId, DisabledAt = DateTime.UtcNow });
-
+                await conn.OpenAsync(ct);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "UPDATE Users SET DisabledAt = @DisabledAt WHERE Id = @UserId";
+                cmd.Parameters.AddWithValue("@DisabledAt", DateTime.UtcNow.ToUniversalTime().ToString("o"));
+                cmd.Parameters.AddWithValue("@UserId", userId);
+                await cmd.ExecuteNonQueryAsync(ct);
                 return TryResult<bool>.Pass(true);
             }
             catch (Exception ex)
@@ -293,17 +307,18 @@ namespace Server.Services
                 _lock.Release();
             }
         }
-        public async Task<TryResult<bool>> EnableUserAsync(string userId)
+       
+        public async Task<TryResult<bool>> EnableUserAsync(string userId, CancellationToken ct = default)
         {
             await _lock.WaitAsync();
             try
             {
-                var sql = "UPDATE Users SET DisabledAt = NULL WHERE Id = @UserId";
-
                 using var conn = new SqliteConnection(_connectionString);
-                await conn.OpenAsync();
-                await conn.ExecuteAsync(sql, new { UserId = userId });
-
+                await conn.OpenAsync(ct);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "UPDATE Users SET DisabledAt = NULL WHERE Id = @UserId";
+                cmd.Parameters.AddWithValue("@UserId", userId);
+                await cmd.ExecuteNonQueryAsync(ct);
                 return TryResult<bool>.Pass(true);
             }
             catch (Exception ex)
@@ -315,5 +330,38 @@ namespace Server.Services
                 _lock.Release();
             }
         }
-    }
+
+        DateTime ParseIso8601Utc(string s)
+        {
+            var dto = DateTimeOffset.ParseExact(s, "o", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+            return dto.UtcDateTime;
+        }
+
+        AppUser MapUser(SqliteDataReader reader)
+        {
+            var idOrd = reader.GetOrdinal("Id");
+            var userNameOrd = reader.GetOrdinal("UserName");
+            var pwdHashOrd = reader.GetOrdinal("PasswordHash");
+            var createdAtOrd = reader.GetOrdinal("CreatedAt");
+            var disabledAtOrd = reader.GetOrdinal("DisabledAt");
+            var rolesJsonOrd = reader.GetOrdinal("RolesJson");
+
+            var createdAtUtc = ParseIso8601Utc(reader.GetString(createdAtOrd));
+
+            DateTime? disabledAtUtc = null;
+            if (!reader.IsDBNull(disabledAtOrd))
+                disabledAtUtc = ParseIso8601Utc(reader.GetString(disabledAtOrd));
+
+            return new AppUser
+            {
+                Id = reader.GetString(idOrd),
+                UserName = reader.GetString(userNameOrd),
+                PasswordHash = reader.GetString(pwdHashOrd),
+                CreatedAt = createdAtUtc,          
+                DisabledAt = disabledAtUtc,        
+                RolesJson = reader.GetString(rolesJsonOrd),
+            };
+        }
+
+}
 }

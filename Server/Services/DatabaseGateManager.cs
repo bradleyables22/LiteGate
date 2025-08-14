@@ -17,7 +17,7 @@ namespace Server.Services
             return _locks.GetOrAdd(dbName.ToLower(), _ => new SemaphoreSlim(1, 1));
         }
 
-        public async Task<TryResult<long>> ExecuteAsync(SqlRequest request) 
+        public async Task<TryResult<long>> ExecuteAsync(SqlRequest request, CancellationToken ct = default) 
         {
             var _lock = GetLockForDatabase(request.Database);
 
@@ -27,16 +27,16 @@ namespace Server.Services
             { 
                 var connectionString = DirectoryManager.BuildSqliteConnectionString(request.Database, readOnly: false);
                 using var conn = new SqliteConnection(connectionString);
-                await conn.OpenAsync();
-                await using var tx = (SqliteTransaction)await conn.BeginTransactionAsync();
+                await conn.OpenAsync(ct);
+                await using var tx = (SqliteTransaction)await conn.BeginTransactionAsync(ct);
 
                 await using var cmd = conn.CreateCommand();
                 cmd.Transaction = tx;
                 cmd.CommandText = request.Statement;
                 cmd.CommandTimeout = Convert.ToInt32(request.Timeout);
 
-                var rows = await cmd.ExecuteNonQueryAsync();
-                await tx.CommitAsync();
+                var rows = await cmd.ExecuteNonQueryAsync(ct);
+                await tx.CommitAsync(ct);
 
                 if (rows == -1)
                     return TryResult<long>.Fail("Sqlite return -1 result", new SqlNullValueException());
@@ -53,60 +53,69 @@ namespace Server.Services
             }
         }
 
-        public async Task<TryResult<List<ExpandoObject>>> QueryAsync(SqlRequest request) 
+        public async Task<TryResult<QueryResult>> QueryAsync(SqlRequest request, CancellationToken ct = default)
         {
             try
             {
-                var connectionString = DirectoryManager.BuildSqliteConnectionString(request.Database, true);
-                using var conn = new SqliteConnection(connectionString);
-                await conn.OpenAsync();
+                const int Limit = 10000;
+
+                var connectionString = DirectoryManager.BuildSqliteConnectionString(request.Database, readOnly: true);
+                await using var conn = new SqliteConnection(connectionString);
+                await conn.OpenAsync(ct);
 
                 await using var cmd = conn.CreateCommand();
                 cmd.CommandText = request.Statement;
                 cmd.CommandTimeout = Convert.ToInt32(request.Timeout);
 
-                await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess);
+                await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct);
 
                 var fieldCount = reader.FieldCount;
                 var columnIndexes = Enumerable.Range(0, fieldCount).ToArray();
                 var columnNames = columnIndexes.Select(reader.GetName).ToArray();
 
-                List<ExpandoObject> results = new List<ExpandoObject>();
-                int iterationMax = 5000;
-                int iterationCount = 0;
-                while (await reader.ReadAsync())
+                var rows = new List<ExpandoObject>(Math.Min(Limit, 256));
+                bool hitLimit = false;
+
+                while (await reader.ReadAsync(ct))
                 {
+                    if (rows.Count >= Limit)
+                    {
+                        hitLimit = true;
+                        break;
+                    }
 
                     var row = new ExpandoObject() as IDictionary<string, object?>;
 
-                    foreach (var columnIndex in columnIndexes)
+                    foreach (var i in columnIndexes)
                     {
-                        if (iterationCount >= iterationMax)
-                            break;
-
                         try
                         {
-                            var name = columnNames[columnIndex];
-                            object? raw = await reader.IsDBNullAsync(columnIndex) ? null : reader.GetValue(columnIndex);
-
+                            var name = columnNames[i];
+                            object? raw = await reader.IsDBNullAsync(i, ct) ? null : reader.GetValue(i);
                             row[ApiExtensions.EnsureUniqueKey(name, row)] = ApiExtensions.NormalizeForJson(raw);
-
-                            iterationCount++;
                         }
-                        catch (Exception)
+                        catch
                         {
                             continue;
                         }
-                        
                     }
 
-                    results.Add((ExpandoObject)row);
+                    rows.Add((ExpandoObject)row);
                 }
-                return TryResult<List<ExpandoObject>>.Pass(results);
+
+                var data = new QueryResult
+                {
+                    Items = rows,
+                    TotalReturned = rows.Count,
+                    Limit = Limit,
+                    HitLimit = hitLimit
+                };
+
+                return new TryResult<QueryResult> { Success = true, Data = data };
             }
             catch (Exception e)
             {
-                return TryResult<List<ExpandoObject>>.Fail(e.Message, e);
+                return TryResult<QueryResult>.Fail(e.Message, e);
             }
         }
     }

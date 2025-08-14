@@ -12,8 +12,8 @@ namespace Server.DatabaseAccess
 
             databaseGroup.MapPost("/execute/{name}", async (DatabaseGateManager _gateManager, HttpContext _context,[FromRoute] string name, [FromHeader] int timeout = 30) =>
             {
-                if (name.ToLower() == "app")
-                    return Results.Forbid();
+                //if (name.ToLower() == "app")
+                //    return Results.Forbid();
 
                 using var reader = new StreamReader(_context.Request.Body);
                 string sql = await reader.ReadToEndAsync();
@@ -105,6 +105,14 @@ namespace Server.DatabaseAccess
 
                 var result = await _gateManager.QueryAsync(new SqlRequest { Database = name, Statement = sql, Timeout = timeout });
 
+
+                if (result.Success)
+                {
+                    if (string.IsNullOrEmpty(result.Message))
+                        return result.ToResult();
+                    else
+                        return Results.Json(result.Data, statusCode: 206);
+                }
                 return result.ToResult();
             })
                 .RequireAuthorization()
