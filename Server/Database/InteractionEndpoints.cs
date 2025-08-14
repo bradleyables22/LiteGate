@@ -2,7 +2,7 @@
 using Server.Services;
 using Server.Utiilites;
 
-namespace Server.DatabaseAccess
+namespace Server.Database
 {
     public static class InteractionEndpoints
     {

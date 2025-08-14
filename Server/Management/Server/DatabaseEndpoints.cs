@@ -1,7 +1,7 @@
-﻿using Dapper;
-using Microsoft.AspNetCore.Http.HttpResults;
+﻿
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
+using Server.Services;
 using Server.Utiilites;
 
 namespace Server.Management.Server
@@ -45,7 +45,7 @@ namespace Server.Management.Server
             .WithDescription("Download a database file by name.")
             .WithSummary("Download Database");
 
-            databaseGroup.MapPost("/create/{name}", async ([FromRoute] string name) =>
+            databaseGroup.MapPost("/create/{name}", async ([FromRoute] string name, DatabaseGateManager _gateManager) =>
             {
                 if (name.ToLower().Contains("."))
                     return Results.BadRequest("Do not specify filetype");
@@ -67,9 +67,9 @@ namespace Server.Management.Server
                 using var conn = new SqliteConnection(connectionString);
                 await conn.OpenAsync();
 
-                var result = await conn.ExecuteScalarAsync<string>("PRAGMA journal_mode = WAL;");
-                if (!string.Equals(result, "wal", StringComparison.OrdinalIgnoreCase))
-                    return Results.Problem(detail: "Issue activating WAL",title: "Error",statusCode: StatusCodes.Status500InternalServerError);
+                var walSql = $"PRAGMA journal_mode = WAL;";
+
+                _= await _gateManager.ExecuteAsync(new SqlRequest { Database = name, Statement = walSql });
 
                 return Results.Ok();
             })
