@@ -1,6 +1,6 @@
 # HostedSqlite – Phase 1
 
-Lightweight, self‑hosted service that gives each authenticated user their own SQLite databases with an HTTP API for management and SQL execution.
+Lightweight, self‑hosted service designed for flexible SQLite database hosting and management via an HTTP API. While it can be used to provide each authenticated user with their own databases, it is not limited or dedicated solely to that use case—supporting broader scenarios such as shared databases, administrative tooling, and generic SQL execution.
 
 ## Phase 1 Scope
 
