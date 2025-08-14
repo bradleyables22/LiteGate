@@ -1,5 +1,4 @@
-﻿using Dapper;
-using Microsoft.Data.Sqlite;
+﻿using Microsoft.Data.Sqlite;
 using Server.Authentication;
 using Server.Authentication.Models;
 using Server.Utiilites;
