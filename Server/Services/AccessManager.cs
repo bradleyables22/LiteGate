@@ -32,8 +32,33 @@ namespace Server.Services
 			("alter","table")
 		};
 
+        public static bool MeetsPermissionRequirements(this List<SystemRole>? roles, SystemRole minRequirement) 
+        {
+            try
+            {
+                if (roles == null || !roles.Any())
+                    return false;
 
-        public static bool HasWritePermissions(this HubCallerContext context ,string db) 
+                switch (minRequirement)
+                {
+                    case SystemRole.admin:
+                        return roles.Any(x => x == SystemRole.admin);
+                    case SystemRole.editor:
+                        return roles.Any(x => x == SystemRole.admin || x == SystemRole.editor);
+                    case SystemRole.viewer:
+                        return roles.Any(x => x == SystemRole.admin || x == SystemRole.editor || x == SystemRole.viewer);
+                    default:
+                        return false;
+                }
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+
+        public static bool HasWritePermissions(this HttpContext context ,string db) 
         {
 			bool allowed = false;
 
@@ -42,7 +67,7 @@ namespace Server.Services
 				if (Convert.ToBoolean(context.User?.Identity?.IsAuthenticated) == false)
 					return allowed;
 
-				var roles = context.User.Claims.Where(x => x.Type == ClaimTypes.Role).Where(x=>x.Value.Contains(db.ToLower())).ToList();
+				var roles = context.User.Claims.Where(x => x.Type == ClaimTypes.Role).Where(x=>x.Value.Contains(db.ToLower()) || x.Value.Contains("*")).ToList();
 
 				if (roles == null || !roles.Any())
 					return allowed;
@@ -56,13 +81,13 @@ namespace Server.Services
 
                 return allowed;
 			}
-			catch (Exception)
+			catch (Exception e)
 			{
 				return allowed;
 			}
         }
 
-		public static List<SystemRole> ExtractAllowedPermissions(this HubCallerContext context, string db)
+		public static List<SystemRole> ExtractAllowedPermissions(this HttpContext context, string db)
 		{
 			List<SystemRole> allowedRoles = new();
 			try

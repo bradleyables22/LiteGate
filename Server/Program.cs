@@ -1,10 +1,9 @@
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Server.Authentication;
 using Server.Authentication.Models;
-using Server.Hubs;
+using Server.DatabaseAccess;
 using Server.Management.Server;
 using Server.Management.User;
 using Server.Services;
@@ -19,8 +18,8 @@ SQLitePCL.Batteries.Init();
 
 builder.Services.AddSingleton<UserDatabase>();
 builder.Services.AddSingleton<ServerSettings>();
-builder.Services.AddSignalR();
 
+builder.Services.AddSingleton<DatabaseGateManager>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -55,7 +54,6 @@ builder.Services.AddCors(options =>
             builder.AllowAnyOrigin();
             builder.AllowAnyHeader();
             builder.AllowAnyMethod();
-            builder.WithExposedHeaders("X-Auth-Info", "X-Auth-Identity", "X-Auth-Error", "X-Auth-Identity-WebAlerts");
         });
 
 });
@@ -136,11 +134,6 @@ app.MapUserManagementEndpoints();
 app.MapUserRoleManagementEndpoints();
 app.MapServerSettingsEndpoints();
 app.MapDatabaseManagementEndpoints();
-
-app.MapHub<DatabaseHub>("/hubs/v1/database", options =>
-{
-    options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
-    options.CloseOnAuthenticationExpiration = true;
-});
+app.MapDatabaseInteractionEndpoints();
 
 app.Run();

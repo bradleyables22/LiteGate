@@ -33,13 +33,13 @@
             };
         }
 
-        public IResult ToResult()
+        public IResult ToResult(bool asText = false)
         {
             if (Success)
             {
-                if (Data is not null)
-                    return Results.Ok(this);
-
+                if (Data is not null) 
+                    return asText ? Results.Text(this.Data.ToString()) : Results.Ok(this.Data); 
+                
                 return Results.NoContent();
             }
 

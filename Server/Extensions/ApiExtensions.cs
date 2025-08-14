@@ -55,12 +55,22 @@ namespace Server.Extensions
                             return l;
                         if (je.TryGetDouble(out var d)) 
                             return d;
-                        return double.Parse(je.GetRawText()); 
+                        return double.Parse(je.GetRawText());
 
                     case System.Text.Json.JsonValueKind.String:
-                        if (je.TryGetDateTimeOffset(out var dto)) 
-                            return dto;
-                        return je.GetString();
+                        var s = je.GetString();
+                        if (string.IsNullOrEmpty(s))
+                            return s;
+
+                        bool hasOffset = System.Text.RegularExpressions.Regex.IsMatch(s, @"[+\-]\d{2}:\d{2}$");
+
+                        if (hasOffset && je.TryGetDateTimeOffset(out var dto))
+                            return dto.ToUniversalTime();
+
+                        if (!hasOffset && DateTime.TryParse(s, out var dt))
+                            return dt.ToUniversalTime();
+
+                        return s;
 
                     case System.Text.Json.JsonValueKind.Array:
                     case System.Text.Json.JsonValueKind.Object:
@@ -99,13 +109,13 @@ namespace Server.Extensions
                     return value;
 
                 case Guid g:
-                    return g.ToString("D");
+                    return g.ToString();
 
                 case DateTime dt:
-                    return DateTime.SpecifyKind(dt, DateTimeKind.Utc).ToString("O", CultureInfo.InvariantCulture);
+                    return dt.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture);
 
                 case DateTimeOffset dto:
-                    return dto.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+                    return dto.ToUniversalTime().ToString();
 
                 case byte[] bytes:
                     return $"base64:{Convert.ToBase64String(bytes)}";
@@ -130,7 +140,7 @@ namespace Server.Extensions
 
             if (DateTime.TryParse(s, CultureInfo.InvariantCulture, styles, out var dt))
             {
-                isoUtc = dt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+                isoUtc = dt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture);
                 return true;
             }
 
@@ -148,7 +158,7 @@ namespace Server.Extensions
 
             if (DateTime.TryParseExact(s, formats, CultureInfo.InvariantCulture, styles, out dt))
             {
-                isoUtc = dt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+                isoUtc = dt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture);
                 return true;
             }
 

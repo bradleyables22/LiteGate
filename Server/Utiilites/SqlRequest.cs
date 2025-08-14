@@ -2,9 +2,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-namespace Server.Hubs.Models
+namespace Server.Utiilites
 {
-    public class QueryRequest 
+    public class SqlRequest
     {
         [ReadOnly(true)]
         [JsonIgnore]
@@ -12,8 +12,7 @@ namespace Server.Hubs.Models
         [Required]
         public string Database { get; set; } = string.Empty;
         [Required]
-        public string Query { get; set; } = string.Empty;
-        public Dictionary<string, object?>? Params { get; set; }
+        public string Statement { get; set; } = string.Empty;
         public int? Timeout { get; set; } = 30;
     }
 }
