@@ -1,6 +1,6 @@
 ﻿using System.Data.SQLite;
 
-namespace Server.Database.Models
+namespace Server.Utiilites
 {
     public class SqliteChangeEvent
     {

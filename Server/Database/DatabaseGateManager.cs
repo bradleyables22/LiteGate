@@ -1,5 +1,4 @@
 ﻿using Microsoft.Data.Sqlite;
-using Server.Database.Models;
 using Server.Extensions;
 using Server.Utiilites;
 using System.Collections.Concurrent;
@@ -8,7 +7,7 @@ using System.Data.SQLite;
 using System.Data.SqlTypes;
 using System.Dynamic;
 using System.Threading.Channels;
-using SSQLite = System.Data.SQLite;       
+using SSQLite = System.Data.SQLite;
 
 namespace Server.Database
 {
