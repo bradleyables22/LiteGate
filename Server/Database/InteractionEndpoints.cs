@@ -18,8 +18,8 @@ namespace Server.Database
                 if (name.ToLower().Contains("."))
                     return Results.BadRequest("Do not specify filetype");
 
-                if (name.ToLower() == "app")
-                    return Results.Forbid();
+                //if (name.ToLower() == "app")
+                //    return Results.Forbid();
 
                 using var reader = new StreamReader(_context.Request.Body);
                 string sql = await reader.ReadToEndAsync();

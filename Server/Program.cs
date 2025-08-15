@@ -4,22 +4,40 @@ using Scalar.AspNetCore;
 using Server.Authentication;
 using Server.Authentication.Models;
 using Server.Database;
+using Server.Database.Models;
 using Server.Management.Server;
 using Server.Management.User;
 using Server.Services;
 using Server.Transformers;
 using System.Net;
 using System.Text;
+using System.Threading.Channels;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 SQLitePCL.Batteries.Init();
 
+
+builder.Services.AddHostedService<ChangeEventProcessor>();
+builder.Services.AddSingleton<Channel<SqliteChangeEvent>>(_ =>
+{
+    var options = new BoundedChannelOptions(capacity: 10000)
+    {
+        SingleReader = true, // Change Event Processor
+        SingleWriter = true, //Gate Manager
+        AllowSynchronousContinuations = true,
+        FullMode = BoundedChannelFullMode.Wait,
+    };
+
+    return Channel.CreateBounded<SqliteChangeEvent>(options);
+});
+
+
 builder.Services.AddSingleton<UserDatabase>();
 builder.Services.AddSingleton<ServerSettings>();
-
 builder.Services.AddSingleton<DatabaseGateManager>();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {

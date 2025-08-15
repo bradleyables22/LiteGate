@@ -1,46 +1,70 @@
 ﻿using Microsoft.Data.Sqlite;
+using Server.Database.Models;
 using Server.Extensions;
 using Server.Utiilites;
 using System.Collections.Concurrent;
 using System.Data;
+using System.Data.SQLite;
 using System.Data.SqlTypes;
 using System.Dynamic;
+using System.Threading.Channels;
+using SSQLite = System.Data.SQLite;       
 
-namespace Server.Services
+namespace Server.Database
 {
     public sealed class DatabaseGateManager
     {
         private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
-
-        SemaphoreSlim GetLockForDatabase(string dbName)
+        private readonly Channel<SqliteChangeEvent> _channel;
+        public DatabaseGateManager(Channel<SqliteChangeEvent> channel)
         {
-            return _locks.GetOrAdd(dbName.ToLower(), _ => new SemaphoreSlim(1, 1));
+            _channel = channel;
         }
 
-        public async Task<TryResult<long>> ExecuteAsync(SqlRequest request, CancellationToken ct = default) 
-        {
-            var _lock = GetLockForDatabase(request.Database);
+        SemaphoreSlim GetLockForDatabase(string dbName) =>
+            _locks.GetOrAdd(dbName.ToLowerInvariant(), _ => new SemaphoreSlim(1, 1));
 
-            await _lock.WaitAsync();
+        public async Task<TryResult<long>> ExecuteAsync(SqlRequest request, CancellationToken ct = default)
+        {
+            var gate = GetLockForDatabase(request.Database);
+            await gate.WaitAsync(ct);
 
             try
-            { 
-                var connectionString = DirectoryManager.BuildSqliteConnectionString(request.Database, readOnly: false);
-                using var conn = new SqliteConnection(connectionString);
-                await conn.OpenAsync(ct);
-                await using var tx = (SqliteTransaction)await conn.BeginTransactionAsync(ct);
+            {
+                var cs = DirectoryManager.BuildSqliteConnectionString(request.Database, readOnly: false);
 
-                await using var cmd = conn.CreateCommand();
-                cmd.Transaction = tx;
+                using var conn = new SSQLite.SQLiteConnection(cs);
+                conn.Open(); 
+
+                List<SqliteChangeEvent> changes = new();
+                void OnUpdate(object? s, SSQLite.UpdateEventArgs e)
+                {
+                    if (string.Equals(e.Database, "main", StringComparison.OrdinalIgnoreCase))
+                        changes.Add(new SqliteChangeEvent { Database = request.Database, Table = e.Table, RowId = e.RowId , EventType = e.Event});
+                }
+
+                conn.Update += OnUpdate;
+
+                using var tx = await conn.BeginTransactionAsync(ct); 
+                using var cmd = conn.CreateCommand();
+                cmd.Transaction = (SQLiteTransaction)tx;
                 cmd.CommandText = request.Statement;
                 cmd.CommandTimeout = Convert.ToInt32(request.Timeout);
 
                 var rows = await cmd.ExecuteNonQueryAsync(ct);
-                
-                await tx.CommitAsync(ct);
+
+                tx.Commit();
+
+                //later only do this if there are actual subscription for the db/table combo
+                foreach (var c in changes)
+                {
+                    await _channel.Writer.WriteAsync(c);
+                }
+
+                conn.Update -= OnUpdate;
 
                 if (rows == -1)
-                    return TryResult<long>.Fail("Sqlite return -1 result", new SqlNullValueException());
+                    return TryResult<long>.Fail("SQLite returned -1", new SqlNullValueException());
 
                 return TryResult<long>.Pass(rows);
             }
@@ -48,9 +72,9 @@ namespace Server.Services
             {
                 return TryResult<long>.Fail(e.Message, e);
             }
-            finally 
+            finally
             {
-                _lock.Release();
+                gate.Release();
             }
         }
 
@@ -60,8 +84,8 @@ namespace Server.Services
             {
                 const int Limit = 10000;
 
-                var connectionString = DirectoryManager.BuildSqliteConnectionString(request.Database, readOnly: true);
-                await using var conn = new SqliteConnection(connectionString);
+                var cs = DirectoryManager.BuildSqliteConnectionString(request.Database, readOnly: true);
+                await using var conn = new SqliteConnection(cs);
                 await conn.OpenAsync(ct);
 
                 await using var cmd = conn.CreateCommand();
@@ -74,7 +98,7 @@ namespace Server.Services
                 var columnIndexes = Enumerable.Range(0, fieldCount).ToArray();
                 var columnNames = columnIndexes.Select(reader.GetName).ToArray();
 
-                var rows = new List<ExpandoObject>(Math.Min(Limit, 256));
+                var rows = new List<ExpandoObject>();
                 bool hitLimit = false;
 
                 while (await reader.ReadAsync(ct))
@@ -112,7 +136,7 @@ namespace Server.Services
                     HitLimit = hitLimit
                 };
 
-                return new TryResult<QueryResult> { Success = true, Data = data };
+                return TryResult<QueryResult>.Pass(data);
             }
             catch (Exception e)
             {
@@ -120,4 +144,5 @@ namespace Server.Services
             }
         }
     }
+
 }
