@@ -1,7 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
 using Server.Authentication;
 using Server.Authentication.Models;
-using Server.Utiilites;
+using Server.Utilities;
 using System.Globalization;
 using System.Text.Json;
 

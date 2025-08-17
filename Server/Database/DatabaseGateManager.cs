@@ -1,6 +1,6 @@
 ﻿using Microsoft.Data.Sqlite;
 using Server.Extensions;
-using Server.Utiilites;
+using Server.Utilities;
 using System.Collections.Concurrent;
 using System.Data;
 using System.Data.SQLite;

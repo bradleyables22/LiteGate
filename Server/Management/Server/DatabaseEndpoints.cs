@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Server.Database;
-using Server.Utiilites;
+using Server.Utilities;
 
 namespace Server.Management.Server
 {

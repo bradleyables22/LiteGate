@@ -8,7 +8,7 @@ using Server.Management.Server;
 using Server.Management.User;
 using Server.Services;
 using Server.Transformers;
-using Server.Utiilites;
+using Server.Utilities;
 using System.Net;
 using System.Text;
 using System.Threading.Channels;
@@ -38,29 +38,32 @@ builder.Services.AddSingleton<UserDatabase>();
 builder.Services.AddSingleton<ServerSettings>();
 builder.Services.AddSingleton<DatabaseGateManager>();
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            ValidateIssuer = true,
-            ValidIssuer = "sqlite.authentication",
-            ValidateAudience = true,
-            ValidAudience = "sqlite.user",
-            RequireSignedTokens = true,
-            ClockSkew = TimeSpan.Zero,
-            IssuerSigningKeyResolver = (token, securityToken, kid, validationParameters) =>
-            {
-                //dont want to restart the server to change secret (you'd lose all data) so need to dynamically pull from the singleton settings
-                var provider = builder.Services.BuildServiceProvider();
-                var serverSettings = provider.GetRequiredService<ServerSettings>();
 
-                var key = Encoding.UTF8.GetBytes(serverSettings.Secret);
-                return new[] { new SymmetricSecurityKey(key) };
-            }
-        };
-    });
+builder.Services
+	.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+	.AddJwtBearer();
+
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+	.Configure<ServerSettings>((options, settings) =>
+	{
+		options.TokenValidationParameters = new TokenValidationParameters
+		{
+			ValidateIssuerSigningKey = true,
+			ValidateIssuer = true,
+			ValidIssuer = "sqlite.authentication",
+			ValidateAudience = true,
+			ValidAudience = "sqlite.user",
+			RequireSignedTokens = true,
+			ClockSkew = TimeSpan.Zero,
+
+			IssuerSigningKeyResolver = (token, securityToken, kid, validationParameters) =>
+			{
+				var keyBytes = Encoding.UTF8.GetBytes(settings.Secret ?? string.Empty);
+				return new[] { new SymmetricSecurityKey(keyBytes) };
+			}
+		};
+	});
+
 
 builder.Services.AddAuthorization();
 

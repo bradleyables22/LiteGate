@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Server.Authentication.Models;
 using Server.Services;
-using Server.Utiilites;
+using Server.Utilities;
 
 namespace Server.Management.User
 {
