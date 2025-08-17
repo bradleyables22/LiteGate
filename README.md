@@ -1,4 +1,4 @@
-# HostedSqlite – Phase 1
+# LiteGate – Phase 1
 
 Lightweight, self‑hosted service designed for flexible SQLite database hosting and management via an HTTP API. While it can be used to provide each authenticated user with their own databases, it is not limited or dedicated solely to that use case—supporting broader scenarios such as shared databases, administrative tooling, and generic SQL execution.
 
