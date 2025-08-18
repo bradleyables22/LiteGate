@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Server.Authentication.Models;
 using Server.Services;
-using Server.Utilities
+using Server.Utilities;
 using System.Data;
 
 namespace Server.Management.User
