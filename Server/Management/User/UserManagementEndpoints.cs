@@ -76,7 +76,16 @@ namespace Server.Management.User
 
                 var changeResult = await _db.ChangePasswordAsync(currentUserId,passwordRequest.Password);
                 if (changeResult.Success)
-                    return Results.Ok();
+                {
+                    if (changeResult.Data)
+                        return Results.Ok();
+                    else
+                        return Results.Problem(
+                                    detail: "Could not change password",
+                                    title: "Failed to update",
+                                    statusCode: StatusCodes.Status500InternalServerError
+                                );
+                }
                 else
                     return changeResult.ToResult(); 
             })
@@ -154,7 +163,19 @@ namespace Server.Management.User
                     return Results.Forbid();
 
                 var deleteResult = await _db.DeleteUserByIdAsync(id);
-                return deleteResult.ToResult();
+                if (deleteResult.Success) 
+                {
+                    if (deleteResult.Data)
+                        return Results.Ok();
+                    else
+                        return Results.Problem(
+                                    detail: "Could not delete user",
+                                    title: "Failed to delete",
+                                    statusCode: StatusCodes.Status500InternalServerError
+                                );
+                }
+                else
+                    return deleteResult.ToResult();
             })
             .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
             .Produces(200)

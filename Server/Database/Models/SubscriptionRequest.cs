@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.Data.SQLite;
 
-namespace Server.Authentication.Models
+namespace Server.Database.Models
 {
 	public class SubscriptionRequest
 	{

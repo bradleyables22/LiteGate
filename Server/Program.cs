@@ -75,6 +75,11 @@ builder.Services.AddCors(options =>
             builder.AllowAnyOrigin();
             builder.AllowAnyHeader();
             builder.AllowAnyMethod();
+            builder.WithExposedHeaders(
+                "X-Webhook-Id",
+                "X-Webhook-Timestamp",
+                "X-Webhook-Signature"
+            );
         });
 
 });
@@ -156,5 +161,6 @@ app.MapUserRoleManagementEndpoints();
 app.MapServerSettingsEndpoints();
 app.MapDatabaseManagementEndpoints();
 app.MapDatabaseInteractionEndpoints();
+app.MapWebHookEndpoints();
 
 app.Run();
