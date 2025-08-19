@@ -372,7 +372,40 @@ namespace Server.Services
                 return TryResult<SubscriptionRecord?>.Fail("Failed to fetch subscription.", ex);
             }
         }
+        public async Task<TryResult<List<SubscriptionRecord>>> GetSubscriptionsByKeysAsync(string database, string table,UpdateEventType evnt,  CancellationToken ct = default)
+        {
+            try
+            {
 
+                using var conn = new SqliteConnection(_connectionString);
+                await conn.OpenAsync(ct);
+
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT Id, UserId, Url, DatabaseName, TableName, Secret, CreatedAt, Event
+                    FROM Subscriptions
+                    WHERE LOWER(DatabaseName) = @db
+                      AND LOWER(TableName) = @tbl
+                      AND Event = @evt
+                ";
+                cmd.Parameters.AddWithValue("@db", database);
+                cmd.Parameters.AddWithValue("@tbl", table);
+                cmd.Parameters.AddWithValue("@evt", (int)evnt);
+
+                var list = new List<SubscriptionRecord>();
+                using var reader = await cmd.ExecuteReaderAsync(ct);
+                while (await reader.ReadAsync(ct))
+                {
+                    list.Add(MapSubscription(reader)); 
+                }
+
+                return TryResult<List<SubscriptionRecord>>.Pass(list);
+            }
+            catch (Exception ex)
+            {
+                return TryResult<List<SubscriptionRecord>>.Fail(ex.Message,ex);
+            }
+        }
         public async Task<OffsetTryResult<SubscriptionRecord>> GetSubscriptionsAsync(long skip, int take, CancellationToken ct = default)
         {
             try

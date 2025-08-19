@@ -1,5 +1,6 @@
 ﻿using Microsoft.Data.Sqlite;
 using Server.Extensions;
+using Server.Services;
 using Server.Utilities;
 using System.Collections.Concurrent;
 using System.Data;
@@ -54,7 +55,6 @@ namespace Server.Database
 
                 tx.Commit();
 
-                //later only do this if there are actual subscription for the db/table combo
                 foreach (var c in changes)
                 {
                     await _channel.Writer.WriteAsync(c);
