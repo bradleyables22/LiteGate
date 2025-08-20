@@ -1,12 +1,86 @@
 ﻿using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
+using Server.Authentication.Models;
+using Server.Services;
+using Server.Utilities;
 using System.Globalization;
 using System.Net.Mime;
+using System.Text;
 using System.Text.Json;
 
 namespace Server.Extensions
 {
     public static class ApiExtensions
     {
+
+        public static string BuildPayload(this SqliteChangeEvent ev, SubscriptionRecord subscription)
+        {
+            var payload = new
+            {
+                SubscriptionId = subscription.Id,
+                subscription.UserId,
+                ev.Timestamp,
+                Scope = new { database = ev.Database, table = ev.Table, Event=ev.EventType, EventString = ev.EventType.ToString() },
+                ev.RowId,
+            };
+            return JsonSerializer.Serialize(payload);
+        }
+
+        public static async Task DeliverWithRetriesAsync(this HttpClient http, SubscriptionRecord sub, SqliteChangeEvent changeEvent, CancellationToken ct)
+        {
+            var delays = new[] { TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(5) };
+            var jsonBody = changeEvent.BuildPayload(sub);
+            for (int attempt = 0; ; attempt++)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+                using var req = new HttpRequestMessage(HttpMethod.Post, sub.Url)
+                {
+                    Content = new StringContent(jsonBody, Encoding.UTF8, "application/json")
+                };
+
+                req.Headers.Add("X-Webhook-Id", sub.Id);
+                req.Headers.Add("X-Webhook-Timestamp", ts);
+
+                if (!string.IsNullOrWhiteSpace(sub.Secret))
+                {
+                    var sig = ChangeEventSigner.ComputeSignature(sub.Secret!, ts, jsonBody);
+                    req.Headers.Add("X-Webhook-Signature", $"t={ts},v1={sig}");
+                }
+
+                req.Headers.Add("X-Idempotency-Key", $"{sub.Id}:{ts}");
+
+                if (attempt > 0) 
+                    req.Headers.Add("X-Webhook-Retry", attempt.ToString());
+
+                HttpResponseMessage? resp = null;
+                try
+                {
+                    resp = await http.SendAsync(req, ct);
+
+                    if ((int)resp.StatusCode is >= 200 and < 300) 
+                        return;
+                }
+                catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+                {
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    resp?.Dispose();
+                }
+
+                if (attempt >= delays.Length)
+                    return;
+
+                await Task.Delay(delays[attempt], ct);
+            }
+        }
+
+
         public static Task WriteResponse(HttpContext context, HealthReport result)
         {
             context.Response.ContentType = MediaTypeNames.Application.Json;

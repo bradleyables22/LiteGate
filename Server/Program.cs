@@ -18,7 +18,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 SQLitePCL.Batteries.Init();
 
-
+builder.Services.AddHttpClient("webhooks", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Sqlite-Subscriptions/1.0");
+});
 builder.Services.AddHostedService<ChangeEventProcessor>();
 builder.Services.AddSingleton<Channel<SqliteChangeEvent>>(_ =>
 {
@@ -78,7 +82,9 @@ builder.Services.AddCors(options =>
             builder.WithExposedHeaders(
                 "X-Webhook-Id",
                 "X-Webhook-Timestamp",
-                "X-Webhook-Signature"
+                "X-Webhook-Signature",
+                "X-Idempotency-Key",
+                "X-Webhook-Retry"
             );
         });
 
