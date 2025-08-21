@@ -87,6 +87,10 @@ namespace Server.Database
 
             webhooksGroup.MapPost("/subscribe", async (UserDatabase _db, HttpContext _http, [FromBody] SubscriptionRequest request) =>
             {
+
+                
+
+
                 var userId = _http.User.FindFirst("id")?.Value;
 
                 if (string.IsNullOrEmpty(userId))
@@ -98,8 +102,14 @@ namespace Server.Database
                     .ToList();
 
                 request.Database = request.Database.Replace(".db", "");
+                var exists = DirectoryManager.DatabaseFileExists(request.Database);
 
-                var databaseRoles = roles.Where(x => x.ToLower().Split(":").FirstOrDefault() == request.Database).ToList();
+                if (!exists)
+                    return Results.NotFound();
+
+                var rawDatabaseStrings = roles.Select(x => x.ToLower().Split(":").FirstOrDefault()).ToList();
+
+                var databaseRoles = rawDatabaseStrings.Where(x => x == request.Database || x == "*").ToList();
 
                 if(databaseRoles is null || !databaseRoles.Any())
                     return Results.Forbid();

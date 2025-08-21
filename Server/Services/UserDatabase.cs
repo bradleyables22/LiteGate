@@ -383,7 +383,7 @@ namespace Server.Services
                 using var cmd = conn.CreateCommand();
                 cmd.CommandText = @"
                     SELECT Id, UserId, Url, DatabaseName, TableName, Secret, CreatedAt, Event
-                    FROM Subscriptions
+                    FROM SubscriptionRecords
                     WHERE LOWER(DatabaseName) = @db
                       AND LOWER(TableName) = @tbl
                       AND Event = @evt

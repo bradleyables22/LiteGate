@@ -42,8 +42,14 @@ namespace Server.Services
                             await gate.WaitAsync(stoppingToken);
                             tasks.Add(Task.Run(async () =>
                             {
-                                try { await _http.DeliverWithRetriesAsync(sub, changeEvent, stoppingToken); }
-                                finally { gate.Release(); }
+                                try 
+                                { 
+                                    await _http.DeliverWithRetriesAsync(sub, changeEvent, stoppingToken); 
+                                }
+                                finally 
+                                { 
+                                    gate.Release(); 
+                                }
                             }, stoppingToken));
                         }
                         await Task.WhenAll(tasks);
