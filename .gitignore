@@ -365,3 +365,4 @@ FodyWeavers.xsd
 /Server/Data/app.db-shm
 /Server/Data/app.db-wal
 /TestConsole
+/TestApi

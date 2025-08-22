@@ -2,47 +2,70 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Server.Authentication;
-using Server.Authentication.Models;
 using Server.Database;
 using Server.Management.Server;
 using Server.Management.User;
 using Server.Services;
 using Server.Transformers;
+using Server.Utilities;
 using System.Net;
 using System.Text;
+using System.Threading.Channels;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 SQLitePCL.Batteries.Init();
 
+builder.Services.AddHttpClient("webhooks", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Sqlite-Subscriptions/1.0");
+});
+builder.Services.AddHostedService<ChangeEventProcessor>();
+builder.Services.AddSingleton<Channel<SqliteChangeEvent>>(_ =>
+{
+    var options = new BoundedChannelOptions(capacity: 10000)
+    {
+        SingleReader = true, // Change Event Processor
+        SingleWriter = true, //Gate Manager
+        AllowSynchronousContinuations = true,
+        FullMode = BoundedChannelFullMode.Wait,
+    };
+
+    return Channel.CreateBounded<SqliteChangeEvent>(options);
+});
+
+
 builder.Services.AddSingleton<UserDatabase>();
 builder.Services.AddSingleton<ServerSettings>();
-
 builder.Services.AddSingleton<DatabaseGateManager>();
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            ValidateIssuer = true,
-            ValidIssuer = "sqlite.authentication",
-            ValidateAudience = true,
-            ValidAudience = "sqlite.user",
-            RequireSignedTokens = true,
-            ClockSkew = TimeSpan.Zero,
-            IssuerSigningKeyResolver = (token, securityToken, kid, validationParameters) =>
-            {
-                //dont want to restart the server to change secret (you'd lose all data) so need to dynamically pull from the singleton settings
-                var provider = builder.Services.BuildServiceProvider();
-                var serverSettings = provider.GetRequiredService<ServerSettings>();
 
-                var key = Encoding.UTF8.GetBytes(serverSettings.Secret);
-                return new[] { new SymmetricSecurityKey(key) };
-            }
-        };
-    });
+builder.Services
+	.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+	.AddJwtBearer();
+
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+	.Configure<ServerSettings>((options, settings) =>
+	{
+		options.TokenValidationParameters = new TokenValidationParameters
+		{
+			ValidateIssuerSigningKey = true,
+			ValidateIssuer = true,
+			ValidIssuer = "sqlite.authentication",
+			ValidateAudience = true,
+			ValidAudience = "sqlite.user",
+			RequireSignedTokens = true,
+			ClockSkew = TimeSpan.Zero,
+
+			IssuerSigningKeyResolver = (token, securityToken, kid, validationParameters) =>
+			{
+				var keyBytes = Encoding.UTF8.GetBytes(settings.Secret ?? string.Empty);
+				return new[] { new SymmetricSecurityKey(keyBytes) };
+			}
+		};
+	});
+
 
 builder.Services.AddAuthorization();
 
@@ -54,6 +77,13 @@ builder.Services.AddCors(options =>
             builder.AllowAnyOrigin();
             builder.AllowAnyHeader();
             builder.AllowAnyMethod();
+            builder.WithExposedHeaders(
+                "X-Webhook-Id",
+                "X-Webhook-Timestamp",
+                "X-Webhook-Signature",
+                "X-Idempotency-Key",
+                "X-Webhook-Retry"
+            );
         });
 
 });
@@ -82,35 +112,9 @@ builder.Services.AddOpenApi("v1", options =>
     options.AddDocumentTransformer<TitleTransformer>();
 });
 
+builder.Services.AddHostedService<SystemSeeder>();
+
 var app = builder.Build();
-
-DirectoryManager.EnsureDatabaseFolder("app");
-
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<UserDatabase>();
-    
-    await db.EnsureTablesExistAsync();
-    await db.EnsureWalEnabledAsync();
-    const string defaultUserName = "SuperAdmin";
-    const string defaultPassword = "ChangeDisPassword123!";
-
-    var userExistsResult = await db.UserExistsAsync(defaultUserName);
-
-    if (!userExistsResult.Data)
-    {
-        var user = new AppUser
-        {
-            UserName = defaultUserName,
-            Roles = new List<DatabaseRole>
-            {
-                new() { Database = "*", Role = SystemRole.admin }
-            }
-        };
-        await db.CreateUserAsync(user, defaultPassword);
-    }
-
-}
 
 app.UseHsts();
 app.UseHttpsRedirection();
@@ -135,5 +139,6 @@ app.MapUserRoleManagementEndpoints();
 app.MapServerSettingsEndpoints();
 app.MapDatabaseManagementEndpoints();
 app.MapDatabaseInteractionEndpoints();
+app.MapWebHookEndpoints();
 
 app.Run();

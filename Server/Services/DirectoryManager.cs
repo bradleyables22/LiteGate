@@ -19,7 +19,9 @@ public static class DirectoryManager
     public static string GetDatabaseFile(string dbName)
     {
         var folder = GetDatabaseFolder(dbName);
-        return Path.Combine(folder, $"{dbName}.db");
+
+       return Path.Combine(folder, $"{dbName}.db");
+        
     }
 
     public static void EnsureDatabaseFolder(string dbName)

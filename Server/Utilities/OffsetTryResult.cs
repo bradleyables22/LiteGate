@@ -1,4 +1,4 @@
-﻿namespace Server.Utiilites
+﻿namespace Server.Utilities
 {
     public class OffsetTryResult<T>
     {

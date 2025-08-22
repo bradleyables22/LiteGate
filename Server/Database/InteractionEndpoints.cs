@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Server.Services;
-using Server.Utiilites;
+using Server.Utilities;
 
 namespace Server.Database
 {

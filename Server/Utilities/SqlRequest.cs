@@ -2,7 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-namespace Server.Utiilites
+namespace Server.Utilities
 {
     public class SqlRequest
     {

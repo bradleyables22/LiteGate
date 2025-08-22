@@ -89,6 +89,8 @@ namespace Server.Services
 
 		public static List<SystemRole> ExtractAllowedPermissions(this HttpContext context, string db)
 		{
+
+
 			List<SystemRole> allowedRoles = new();
 			try
 			{

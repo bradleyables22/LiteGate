@@ -23,7 +23,9 @@ namespace Server.Authentication
             {
                 foreach (var role in user.Roles)
                 {
-                    identity.AddClaim(new Claim(ClaimTypes.Role, $"{role.Database}:{role.Role}"));
+                    var dbName = role.Database.Replace(".db", "");
+
+                    identity.AddClaim(new Claim(ClaimTypes.Role, $"{dbName}:{role.Role}"));
                 }
             }
            

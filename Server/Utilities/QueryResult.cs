@@ -1,6 +1,6 @@
 ﻿using System.Dynamic;
 
-namespace Server.Utiilites
+namespace Server.Utilities
 {
     public class QueryResult
     {
