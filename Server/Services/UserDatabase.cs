@@ -21,6 +21,7 @@ namespace Server.Services
 
         public async Task<TryResult<bool>> EnsureWalEnabledAsync(CancellationToken ct = default)
         {
+            await _lock.WaitAsync(ct);
             try
             {
                 using var conn = new SqliteConnection(_connectionString);
@@ -37,6 +38,33 @@ namespace Server.Services
             catch (Exception ex)
             {
                 return TryResult<bool>.Fail("Exception occurred while enabling WAL mode.", ex);
+            }
+            finally 
+            {
+                _lock.Release();
+            }
+        }
+        
+        public async Task<TryResult<bool>> TruncateWalAsync(CancellationToken ct = default)
+        {
+            await _lock.WaitAsync(ct);
+            try
+            {
+                using var conn = new SqliteConnection(_connectionString);
+                await conn.OpenAsync(ct);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+                var result = await cmd.ExecuteScalarAsync(ct);
+
+                return TryResult<bool>.Pass(true);
+            }
+            catch (Exception ex)
+            {
+                return TryResult<bool>.Fail("Failed to truncate WAL.", ex);
+            }
+            finally
+            {
+                _lock.Release();
             }
         }
 
@@ -89,7 +117,39 @@ namespace Server.Services
             }
         }
 
-        public async Task<OffsetTryResult<AppUser>> GetUsersAsync(long skip, int take, CancellationToken ct = default)
+        public async Task<TryResult<List<AppUser>>> GetAllUsersAsync(CancellationToken ct = default) 
+        {
+            try
+            {
+                using var conn = new SqliteConnection(_connectionString);
+                await conn.OpenAsync(ct);
+
+                int totalCount;
+                using (var countCmd = conn.CreateCommand())
+                {
+                    countCmd.CommandText = "SELECT COUNT(*) FROM Users;";
+                    totalCount = Convert.ToInt32(await countCmd.ExecuteScalarAsync(ct));
+                }
+
+                var users = new List<AppUser>();
+                using (var dataCmd = conn.CreateCommand())
+                {
+                    dataCmd.CommandText = "SELECT * FROM Users";
+
+                    using var reader = await dataCmd.ExecuteReaderAsync(ct);
+                    while (await reader.ReadAsync(ct))
+                        users.Add(MapUser(reader));
+                }
+
+                return TryResult<List<AppUser>>.Pass(users);
+
+            }
+            catch (Exception e)
+            {
+                return TryResult<List<AppUser>>.Fail(e.Message, e);
+            }
+        }
+        public async Task<OffsetTryResult<AppUser>> GetUsersByOffsetAsync(long skip, int take, CancellationToken ct = default)
         {
             try
             {
@@ -267,6 +327,8 @@ namespace Server.Services
                 if (await reader.ReadAsync())
                     return TryResult<AppUser?>.Pass(MapUser(reader));
 
+                
+
                 return TryResult<AppUser?>.Pass(null);
             }
             catch (Exception ex)
@@ -372,6 +434,7 @@ namespace Server.Services
                 return TryResult<SubscriptionRecord?>.Fail("Failed to fetch subscription.", ex);
             }
         }
+
         public async Task<TryResult<List<SubscriptionRecord>>> GetSubscriptionsByKeysAsync(string database, string table,UpdateEventType evnt,  CancellationToken ct = default)
         {
             try
@@ -406,6 +469,7 @@ namespace Server.Services
                 return TryResult<List<SubscriptionRecord>>.Fail(ex.Message,ex);
             }
         }
+
         public async Task<OffsetTryResult<SubscriptionRecord>> GetSubscriptionsAsync(long skip, int take, CancellationToken ct = default)
         {
             try
@@ -587,6 +651,7 @@ namespace Server.Services
             var dto = DateTimeOffset.ParseExact(s, "o", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
             return dto.UtcDateTime;
         }
+
         AppUser MapUser(SqliteDataReader reader)
         {
             var idOrd = reader.GetOrdinal("Id");
@@ -612,6 +677,7 @@ namespace Server.Services
                 RolesJson = reader.GetString(rolesJsonOrd),
             };
         }
+
         SubscriptionRecord MapSubscription(SqliteDataReader reader)
         {
             var idOrd = reader.GetOrdinal("Id");

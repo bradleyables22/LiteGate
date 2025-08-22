@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Server.Authentication;
-using Server.Authentication.Models;
 using Server.Database;
 using Server.Management.Server;
 using Server.Management.User;
@@ -41,7 +40,6 @@ builder.Services.AddSingleton<Channel<SqliteChangeEvent>>(_ =>
 builder.Services.AddSingleton<UserDatabase>();
 builder.Services.AddSingleton<ServerSettings>();
 builder.Services.AddSingleton<DatabaseGateManager>();
-
 
 builder.Services
 	.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -114,35 +112,9 @@ builder.Services.AddOpenApi("v1", options =>
     options.AddDocumentTransformer<TitleTransformer>();
 });
 
+builder.Services.AddHostedService<SystemSeeder>();
+
 var app = builder.Build();
-
-DirectoryManager.EnsureDatabaseFolder("app");
-
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<UserDatabase>();
-    
-    await db.EnsureTablesExistAsync();
-    await db.EnsureWalEnabledAsync();
-    const string defaultUserName = "SuperAdmin";
-    const string defaultPassword = "ChangeDisPassword123!";
-
-    var userExistsResult = await db.UserExistsAsync(defaultUserName);
-
-    if (!userExistsResult.Data)
-    {
-        var user = new AppUser
-        {
-            UserName = defaultUserName,
-            Roles = new List<DatabaseRole>
-            {
-                new() { Database = "*", Role = SystemRole.admin }
-            }
-        };
-        await db.CreateUserAsync(user, defaultPassword);
-    }
-
-}
 
 app.UseHsts();
 app.UseHttpsRedirection();

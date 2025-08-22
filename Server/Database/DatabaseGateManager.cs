@@ -1,6 +1,5 @@
 ﻿using Microsoft.Data.Sqlite;
 using Server.Extensions;
-using Server.Services;
 using Server.Utilities;
 using System.Collections.Concurrent;
 using System.Data;
@@ -8,13 +7,11 @@ using System.Data.SQLite;
 using System.Data.SqlTypes;
 using System.Dynamic;
 using System.Threading.Channels;
-using SSQLite = System.Data.SQLite;
-
 namespace Server.Database
 {
     public sealed class DatabaseGateManager
     {
-        private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
+        public readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
         private readonly Channel<SqliteChangeEvent> _channel;
         public DatabaseGateManager(Channel<SqliteChangeEvent> channel)
         {
@@ -24,6 +21,85 @@ namespace Server.Database
         SemaphoreSlim GetLockForDatabase(string dbName) =>
             _locks.GetOrAdd(dbName.ToLowerInvariant(), _ => new SemaphoreSlim(1, 1));
 
+
+        public async Task<TryResult<bool>> VacuumAsync(string databaseName, CancellationToken ct = default)
+        {
+            var gate = GetLockForDatabase(databaseName);
+            await gate.WaitAsync(ct);
+            try
+            {
+                var cs = DirectoryManager.BuildSqliteConnectionString(databaseName, readOnly: false);
+                using var conn = new SQLiteConnection(cs);
+                await conn.OpenAsync(ct);
+
+                using var cmd = conn.CreateCommand();
+
+                cmd.CommandText = "VACUUM;";
+                await cmd.ExecuteNonQueryAsync(ct);
+                cmd.CommandText = "PRAGMA journal_mode = WAL;";
+                await cmd.ExecuteScalarAsync(ct);
+                return TryResult<bool>.Pass(true);
+            }
+            catch (Exception ex)
+            {
+                return TryResult<bool>.Fail("Failed to vacuum database.", ex);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        public async Task<TryResult<bool>> TruncateWalAsync(string databaseName,CancellationToken ct = default)
+        {
+            var gate = GetLockForDatabase(databaseName);
+            await gate.WaitAsync(ct);
+            try
+            {
+                var cs = DirectoryManager.BuildSqliteConnectionString(databaseName, readOnly: false);
+                using var conn = new SQLiteConnection(cs);
+                await conn.OpenAsync(ct);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+                var result = await cmd.ExecuteScalarAsync(ct);
+
+                return TryResult<bool>.Pass(true);
+            }
+            catch (Exception ex)
+            {
+                return TryResult<bool>.Fail("Failed to truncate WAL.", ex);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+        public async Task<TryResult<bool>> EnsureWalEnabledAsync(string databaseName,CancellationToken ct = default)
+        {
+            var gate = GetLockForDatabase(databaseName);
+            await gate.WaitAsync(ct);
+
+            try
+            {
+                var cs = DirectoryManager.BuildSqliteConnectionString(databaseName, readOnly: false);
+                using var conn = new SqliteConnection(cs);
+                await conn.OpenAsync(ct);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "PRAGMA journal_mode = WAL;";
+                var result = (await cmd.ExecuteScalarAsync(ct))?.ToString();
+                
+                if (!string.Equals(result, "wal", StringComparison.OrdinalIgnoreCase))
+                    return TryResult<bool>.Fail("Failed to enable WAL mode.", new Exception($"Unexpected journal_mode result: {result}"));
+
+                return TryResult<bool>.Pass(true);
+            }
+            catch (Exception ex)
+            {
+                return TryResult<bool>.Fail("Exception occurred while enabling WAL mode.", ex);
+            }
+            finally { gate.Release(); }
+        }
+
         public async Task<TryResult<long>> ExecuteAsync(SqlRequest request, CancellationToken ct = default)
         {
             var gate = GetLockForDatabase(request.Database);
@@ -31,16 +107,19 @@ namespace Server.Database
 
             try
             {
-                var cs = DirectoryManager.BuildSqliteConnectionString(request.Database, readOnly: false);
-
-                using var conn = new SSQLite.SQLiteConnection(cs);
-                conn.Open(); 
+                var builder = new SQLiteConnectionStringBuilder();
+                builder.DataSource = DirectoryManager.GetDatabaseFile(request.Database);
+                builder.JournalMode = SQLiteJournalModeEnum.Wal;
+                builder.Version = 3;
+                builder.CacheSize = 0;
+                using var conn = new SQLiteConnection(builder.ConnectionString);
+                conn.Open();
 
                 List<SqliteChangeEvent> changes = new();
-                void OnUpdate(object? s, SSQLite.UpdateEventArgs e)
+                void OnUpdate(object? s, UpdateEventArgs e)
                 {
                     if (string.Equals(e.Database, "main", StringComparison.OrdinalIgnoreCase))
-                        changes.Add(new SqliteChangeEvent { Database = request.Database, Table = e.Table, RowId = e.RowId , EventType = e.Event});
+                        changes.Add(new SqliteChangeEvent { Database = request.Database, Table = e.Table, RowId = e.RowId, EventType = e.Event });
                 }
 
                 conn.Update += OnUpdate;
@@ -140,6 +219,30 @@ namespace Server.Database
             catch (Exception e)
             {
                 return TryResult<QueryResult>.Fail(e.Message, e);
+            }
+        }
+
+        public async Task PrimeNewDatabaseAsync(string databaseName, CancellationToken ct = default) 
+        {
+            var tableName = Guid.NewGuid();
+            var createTableSql = $"CREATE TABLE IF NOT EXISTS _TEST-{tableName}_ (Id INTEGER PRIMARY KEY AUTOINCREMENT,Data TEXT);";
+            var querySql = $"Select * from _TEST-{tableName}_;";
+            var dropTableSql = $"DROP TABLE IF EXISTS _TEST-{tableName}_;";
+            try
+            {
+                _ = await ExecuteAsync(new SqlRequest { Database = databaseName, Statement = createTableSql });
+
+                _ = await QueryAsync(new SqlRequest { Database = databaseName, Statement = querySql });
+
+                _ = await ExecuteAsync(new SqlRequest { Database = databaseName, Statement = dropTableSql });
+
+                _ = await TruncateWalAsync(databaseName);
+
+                return;
+            }
+            catch (Exception)
+            {
+
             }
         }
     }

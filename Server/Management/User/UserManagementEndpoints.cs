@@ -13,7 +13,7 @@ namespace Server.Management.User
 
             userGroup.MapGet("", async (UserDatabase _db, long skip = 0, int take = 10) =>
             {
-                var usersResult = await _db.GetUsersAsync(skip, take);
+                var usersResult = await _db.GetUsersByOffsetAsync(skip, take);
 
                 return usersResult.ToResult();
             })

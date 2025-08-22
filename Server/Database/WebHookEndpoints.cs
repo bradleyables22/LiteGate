@@ -165,7 +165,6 @@ namespace Server.Database
             .WithSummary("Subscribe")
             ;
 
-
             webhooksGroup.MapDelete("/{recordId}", async (UserDatabase _db, HttpContext _http, string recordId) =>
             {
                 var userId = _http.User.FindFirst("id")?.Value;
@@ -225,6 +224,49 @@ namespace Server.Database
             .WithName("DeleteSubscription")
             .WithDescription("Delete a subscription. Admins may delete any subscription.")
             .WithSummary("Delete")
+            ;
+
+            webhooksGroup.MapDelete("/clear/{userid}", async (UserDatabase _db, string userId) =>
+            {
+                var clearResult = await _db.ClearSubscriptionsByUserAsync(userId);
+
+                if (clearResult.Success)
+                    return Results.Ok();
+
+                return clearResult.ToResult();
+
+            })
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
+            .Produces(200)
+            .WithOpenApi()
+            .WithDisplayName("ClearUserSubscriptions")
+            .WithName("ClearUserSubscriptions")
+            .WithDescription("Clear all subscriptions for a given user.")
+            .WithSummary("Clear")
+            ;
+
+            webhooksGroup.MapDelete("/self/clear", async (UserDatabase _db, HttpContext _http) =>
+            {
+                var userId = _http.User.FindFirst("id")?.Value;
+
+                if (string.IsNullOrEmpty(userId))
+                    return Results.Forbid();
+
+                var clearResult = await _db.ClearSubscriptionsByUserAsync(userId);
+
+                if (clearResult.Success)
+                    return Results.Ok();
+
+                return clearResult.ToResult();
+
+            })
+            .RequireAuthorization()
+            .Produces(200)
+            .WithOpenApi()
+            .WithDisplayName("ClearSubscriptions")
+            .WithName("ClearSubscriptions")
+            .WithDescription("Clear all subscriptions for the authenticated user.")
+            .WithSummary("Clear Self")
             ;
 
 

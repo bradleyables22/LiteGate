@@ -44,10 +44,10 @@ namespace Server.Management.User
 
                 foreach (var role in roles)
                 {
+
                     if (role.Database != "*")
                     {
-                        if (!role.Database.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
-                            role.Database += ".db";
+                        role.Database = role.Database.Replace(".db", "");
 
                         var exists = DirectoryManager.DatabaseFileExists(role.Database);
                         if (!exists)
@@ -91,12 +91,12 @@ namespace Server.Management.User
 
                 if (role.Database != "*")
                 {
+
+                    role.Database = role.Database.Replace(".db", "");
                     var databaseExists = DirectoryManager.DatabaseFileExists(role.Database);
                     if (!databaseExists)
                         return Results.BadRequest("Database doesn't exist");
-
-                    if (!role.Database.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
-                        role.Database += ".db";
+                    
                 }
 
                 var existingRole = userResult.Data.Roles.Where(x => x.Database == role.Database && x.Role == role.Role).FirstOrDefault();
@@ -134,6 +134,8 @@ namespace Server.Management.User
 
                 if (userResult.Data.Roles is null)
                     userResult.Data.Roles = new();
+
+                role.Database = role.Database.Replace(".db", "");
 
                 var existingRole = userResult.Data.Roles.Where(x => x.Database == role.Database && x.Role == role.Role).FirstOrDefault();
 
