@@ -16,6 +16,8 @@ LiteGate is a lightweight, self‑hosted HTTP API for hosting and interacting wi
 
 The current state of this project requires System.Data.Sqlite for access to the native C binding for `sqlite3_update_hook` which is utilized for webhook subscriptions for change notificiations. This means that currently this implemntation requires to be run on a IIS Windows Server.
 
+I plan to write an implementation for Microsoft.Data.Sqlite and SQLitePCL to replicate this shortly.
+
 ## Quickstart
 
 ### Prerequisites
