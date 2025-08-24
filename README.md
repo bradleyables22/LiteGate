@@ -2,7 +2,7 @@
 
 LiteGate is a lightweight, self‑hosted HTTP API for hosting and interacting with **SQLite** databases. It provides straightforward endpoints to create/manage databases, run SQL, and subscribe to change events via **HMAC‑signed webhooks**.
 
-> **Highlights**
+**Highlights**
 > - Multi‑database hosting: can be scoped per‑user or shared
 > - Raw SQL over HTTP (`application/sql`)
 > - JWT auth with role claims (e.g., `*:admin`, `app:admin`)
@@ -11,12 +11,6 @@ LiteGate is a lightweight, self‑hosted HTTP API for hosting and interacting wi
 > - Vacuum, checkpoint truncate, download, create, delete endpoints
 
 ---
-
-## Warning!
-
-The current state of this project requires System.Data.Sqlite for access to the native C binding for `sqlite3_update_hook` which is utilized for webhook subscriptions for change notificiations. This means that currently this implemntation requires to be run on a IIS Windows Server.
-
-I plan to write an implementation for Microsoft.Data.Sqlite and SQLitePCL to replicate this shortly.
 
 ## Quickstart
 
