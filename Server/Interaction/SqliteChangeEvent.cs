@@ -1,6 +1,8 @@
-﻿using System.Data.SQLite;
+﻿
 
-namespace Server.Utilities
+using Server.Interaction.Enums;
+
+namespace Server.Interaction
 {
     public class SqliteChangeEvent
     {

@@ -15,7 +15,7 @@ namespace Server.Management.Server
 
                 return Results.Ok();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin","app.db:admin"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin","app:admin"))
             .Produces(200)
             .WithOpenApi()
             .WithDisplayName("ChangeSecret")
@@ -33,7 +33,7 @@ namespace Server.Management.Server
 
                 return Results.Ok();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app:admin"))
             .Produces(200)
             .WithOpenApi()
             .WithDisplayName("ChangeExpiry")

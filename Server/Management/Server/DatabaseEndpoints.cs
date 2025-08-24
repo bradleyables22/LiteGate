@@ -1,11 +1,7 @@
-﻿
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.Sqlite;
+﻿using Microsoft.AspNetCore.Mvc;
 using Server.Authentication.Models;
-using Server.Database;
+using Server.Interaction;
 using Server.Services;
-using Server.Utilities;
-using System.Data.Entity;
 
 namespace Server.Management.Server
 {
@@ -195,11 +191,11 @@ namespace Server.Management.Server
                 var fileName = DirectoryManager.GetDatabaseFile(name);
 
                 _= await _gateManager.EnsureWalEnabledAsync(name);
-                await _gateManager.PrimeNewDatabaseAsync(name);
+               await _gateManager.PrimeNewDatabaseAsync(name);
 
                 return Results.Ok();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin","app.db:admin"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin","app:admin"))
             .Produces(200)
             .WithOpenApi()
             .WithDisplayName("CreateDatabase")
@@ -254,7 +250,7 @@ namespace Server.Management.Server
                 else
                     return Results.NotFound();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app:admin"))
             .Produces(200)
             .WithOpenApi()
             .WithDisplayName("DeleteDatabase")

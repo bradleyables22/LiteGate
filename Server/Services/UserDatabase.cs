@@ -1,8 +1,8 @@
 ﻿using Microsoft.Data.Sqlite;
 using Server.Authentication;
 using Server.Authentication.Models;
+using Server.Interaction.Enums;
 using Server.Utilities;
-using System.Data.SQLite;
 using System.Globalization;
 using System.Text.Json;
 

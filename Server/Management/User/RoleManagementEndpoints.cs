@@ -23,7 +23,7 @@ namespace Server.Management.User
 
                 return Results.Ok(roles);
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:editor", "*:viewer", "app.db:admin", "app.db:editor", "app.db:viewer"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:editor", "*:viewer", "app:admin", "app:editor", "app:viewer"))
             .Produces<List<RoleDefinition>>()
             .WithOpenApi()
             .WithDisplayName("GetRoles")
@@ -66,7 +66,7 @@ namespace Server.Management.User
 
                 return result.ToResult();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app:admin"))
             .Produces<AppUser>()
             .Accepts<UserCredentials>("application/json")
             .WithOpenApi()
@@ -112,7 +112,7 @@ namespace Server.Management.User
                 return result.ToResult();
 
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app:admin"))
             .Produces<AppUser>()
             .WithOpenApi()
             .WithDisplayName("AddUserRole")
@@ -155,7 +155,7 @@ namespace Server.Management.User
                 return result.ToResult();
 
             })
-           .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
+           .RequireAuthorization(policy => policy.RequireRole("*:admin", "app:admin"))
            .Produces<AppUser>()
            .WithOpenApi()
            .WithDisplayName("RemoveUserRole")
@@ -186,7 +186,7 @@ namespace Server.Management.User
 
                 return result.ToResult();
             })
-           .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
+           .RequireAuthorization(policy => policy.RequireRole("*:admin", "app:admin"))
            .Produces<AppUser>()
            .WithOpenApi()
            .WithDisplayName("ClearUserRoles")

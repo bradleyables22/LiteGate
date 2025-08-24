@@ -57,7 +57,6 @@ namespace Server.Services
             }
         }
 
-
         public static bool HasWritePermissions(this HttpContext context ,string db) 
         {
 			bool allowed = false;
@@ -81,7 +80,7 @@ namespace Server.Services
 
                 return allowed;
 			}
-			catch (Exception e)
+			catch (Exception)
 			{
 				return allowed;
 			}

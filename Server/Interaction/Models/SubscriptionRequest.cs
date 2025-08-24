@@ -1,7 +1,7 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.Data.SQLite;
+﻿using Server.Interaction.Enums;
+using System.ComponentModel.DataAnnotations;
 
-namespace Server.Database.Models
+namespace Server.Interaction.Models
 {
 	public class SubscriptionRequest
 	{
