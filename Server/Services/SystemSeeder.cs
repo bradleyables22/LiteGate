@@ -38,7 +38,7 @@ namespace Server.Services
                 await _db.TruncateWalAsync();
 
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 
             }

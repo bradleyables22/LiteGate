@@ -1,13 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Server.Authentication.Models;
-using Server.Database.Models;
+using Server.Interaction.Enums;
+using Server.Interaction.Models;
 using Server.Services;
 using Server.Utilities;
-using System.Data.SQLite;
 using System.Security.Claims;
 using static System.Net.WebRequestMethods;
 
-namespace Server.Database
+namespace Server.Interaction
 {
 	public static class WebHookEndpoints
 	{
@@ -87,10 +87,6 @@ namespace Server.Database
 
             webhooksGroup.MapPost("/subscribe", async (UserDatabase _db, HttpContext _http, [FromBody] SubscriptionRequest request) =>
             {
-
-                
-
-
                 var userId = _http.User.FindFirst("id")?.Value;
 
                 if (string.IsNullOrEmpty(userId))

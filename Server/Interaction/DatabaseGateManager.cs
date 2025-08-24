@@ -1,13 +1,13 @@
 ﻿using Microsoft.Data.Sqlite;
 using Server.Extensions;
+using Server.Interaction.Enums;
 using Server.Utilities;
 using System.Collections.Concurrent;
 using System.Data;
-using System.Data.SQLite;
 using System.Data.SqlTypes;
 using System.Dynamic;
 using System.Threading.Channels;
-namespace Server.Database
+namespace Server.Interaction
 {
     public sealed class DatabaseGateManager
     {
@@ -18,9 +18,7 @@ namespace Server.Database
             _channel = channel;
         }
 
-        SemaphoreSlim GetLockForDatabase(string dbName) =>
-            _locks.GetOrAdd(dbName.ToLowerInvariant(), _ => new SemaphoreSlim(1, 1));
-
+        SemaphoreSlim GetLockForDatabase(string dbName) => _locks.GetOrAdd(dbName.ToLowerInvariant(), _ => new SemaphoreSlim(1, 1));
 
         public async Task<TryResult<bool>> VacuumAsync(string databaseName, CancellationToken ct = default)
         {
@@ -29,7 +27,7 @@ namespace Server.Database
             try
             {
                 var cs = DirectoryManager.BuildSqliteConnectionString(databaseName, readOnly: false);
-                using var conn = new SQLiteConnection(cs);
+                using var conn = new SqliteConnection(cs);
                 await conn.OpenAsync(ct);
 
                 using var cmd = conn.CreateCommand();
@@ -57,7 +55,7 @@ namespace Server.Database
             try
             {
                 var cs = DirectoryManager.BuildSqliteConnectionString(databaseName, readOnly: false);
-                using var conn = new SQLiteConnection(cs);
+                using var conn = new SqliteConnection(cs);
                 await conn.OpenAsync(ct);
                 using var cmd = conn.CreateCommand();
                 cmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
@@ -84,8 +82,13 @@ namespace Server.Database
                 var cs = DirectoryManager.BuildSqliteConnectionString(databaseName, readOnly: false);
                 using var conn = new SqliteConnection(cs);
                 await conn.OpenAsync(ct);
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText = "PRAGMA journal_mode = WAL;";
+
+
+				await using var tx = await conn.BeginTransactionAsync(ct);
+				using var cmd = conn.CreateCommand();
+				cmd.Transaction = (SqliteTransaction)tx;
+				cmd.CommandText = "PRAGMA journal_mode = WAL;";
+
                 var result = (await cmd.ExecuteScalarAsync(ct))?.ToString();
                 
                 if (!string.Equals(result, "wal", StringComparison.OrdinalIgnoreCase))
@@ -100,63 +103,67 @@ namespace Server.Database
             finally { gate.Release(); }
         }
 
-        public async Task<TryResult<long>> ExecuteAsync(SqlRequest request, CancellationToken ct = default)
-        {
-            var gate = GetLockForDatabase(request.Database);
-            await gate.WaitAsync(ct);
 
-            try
-            {
-                var builder = new SQLiteConnectionStringBuilder();
-                builder.DataSource = DirectoryManager.GetDatabaseFile(request.Database);
-                builder.JournalMode = SQLiteJournalModeEnum.Wal;
-                builder.Version = 3;
-                builder.CacheSize = 0;
-                using var conn = new SQLiteConnection(builder.ConnectionString);
-                conn.Open();
+		public async Task<TryResult<long>> ExecuteAsync(SqlRequest request, CancellationToken ct = default)
+		{
+			var gate = GetLockForDatabase(request.Database);
+			await gate.WaitAsync(ct);
 
-                List<SqliteChangeEvent> changes = new();
-                void OnUpdate(object? s, UpdateEventArgs e)
-                {
-                    if (string.Equals(e.Database, "main", StringComparison.OrdinalIgnoreCase))
-                        changes.Add(new SqliteChangeEvent { Database = request.Database, Table = e.Table, RowId = e.RowId, EventType = e.Event });
-                }
+			try
+			{
+                var cs = DirectoryManager.BuildSqliteConnectionString(request.Database);
 
-                conn.Update += OnUpdate;
+				await using var conn = new SqliteConnection(cs);
+				await conn.OpenAsync(ct);
 
-                using var tx = await conn.BeginTransactionAsync(ct); 
-                using var cmd = conn.CreateCommand();
-                cmd.Transaction = (SQLiteTransaction)tx;
-                cmd.CommandText = request.Statement;
-                cmd.CommandTimeout = Convert.ToInt32(request.Timeout);
+				var changes = new List<SqliteChangeEvent>();
+				using var sub = Server.Interaction.SqliteHooks.RegisterUpdateHook(
+					conn,
+					(op, dbName, table, rowid) =>
+					{
+						if (string.Equals(dbName, "main", StringComparison.OrdinalIgnoreCase))
+						{
+							changes.Add(new SqliteChangeEvent
+							{
+								Database = request.Database,
+								Table = table,
+								RowId = rowid,
+								EventType = (UpdateEventType)op
+							});
+						}
+					});
 
-                var rows = await cmd.ExecuteNonQueryAsync(ct);
+				await using var tx = await conn.BeginTransactionAsync(ct);
+				await using var cmd = conn.CreateCommand();
+				cmd.Transaction = (SqliteTransaction)tx;
+				cmd.CommandText = request.Statement;
+				cmd.CommandTimeout = Convert.ToInt32(request.Timeout);
 
-                tx.Commit();
+				var rows = await cmd.ExecuteNonQueryAsync(ct);
+				await tx.CommitAsync(ct);
 
-                foreach (var c in changes)
-                {
-                    await _channel.Writer.WriteAsync(c);
-                }
+				foreach (var c in changes)
+				{
+					await _channel.Writer.WriteAsync(c, ct);
+				}
 
-                conn.Update -= OnUpdate;
+				if (rows == -1)
+					return TryResult<long>.Fail("SQLite returned -1", new SqlNullValueException());
 
-                if (rows == -1)
-                    return TryResult<long>.Fail("SQLite returned -1", new SqlNullValueException());
+				return TryResult<long>.Pass(rows);
+			}
+			catch (Exception e)
+			{
+				return TryResult<long>.Fail(e.Message, e);
+			}
+			finally
+			{
+				gate.Release();
+			}
 
-                return TryResult<long>.Pass(rows);
-            }
-            catch (Exception e)
-            {
-                return TryResult<long>.Fail(e.Message, e);
-            }
-            finally
-            {
-                gate.Release();
-            }
-        }
+		}
 
-        public async Task<TryResult<QueryResult>> QueryAsync(SqlRequest request, CancellationToken ct = default)
+		public async Task<TryResult<QueryResult>> QueryAsync(SqlRequest request, CancellationToken ct = default)
         {
             try
             {

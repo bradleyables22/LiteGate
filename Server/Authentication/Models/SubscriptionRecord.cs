@@ -1,6 +1,5 @@
 ﻿
-using Server.Database.Models;
-using System.Data.SQLite;
+using Server.Interaction.Enums;
 using System.Text.Json.Serialization;
 
 namespace Server.Authentication.Models
