@@ -2,6 +2,7 @@
 using Server.Authentication.Models;
 using Server.Interaction;
 using Server.Services;
+using Server.Utilities;
 
 namespace Server.Management.Server
 {
@@ -15,8 +16,8 @@ namespace Server.Management.Server
             {
                 return Results.Ok(DirectoryManager.ListDatabases());
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:editor", "*:viewer", "app.db:admin", "app.db:editor", "app.db:viewer"))
-            .Produces<IReadOnlyList<string>>(200)
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "*:editor", "*:viewer", "app:admin", "app:editor", "app:viewer"))
+            .Produces<IReadOnlyList<DatabaseLookupResult>>(200)
             .WithOpenApi()
             .WithDisplayName("ListDatabases")
             .WithName("ListDatabases")

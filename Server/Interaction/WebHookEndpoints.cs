@@ -41,7 +41,7 @@ namespace Server.Interaction
 
 				return result.ToResult();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app:admin"))
             .Produces<OffsetTryResult<SubscriptionRecord>>(200)
             .WithOpenApi()
             .WithDisplayName("SubscriptionsPaged")
@@ -56,7 +56,7 @@ namespace Server.Interaction
 
                 return result.ToResult();
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app:admin"))
             .Produces<OffsetTryResult<SubscriptionRecord>>(200)
             .WithOpenApi()
             .WithDisplayName("SubscriptionsByUser")
@@ -170,7 +170,7 @@ namespace Server.Interaction
 
                 bool fullAccess = false;
 
-                if (_http.User.IsInRole("*:admin") || _http.User.IsInRole("app.db:admin"))
+                if (_http.User.IsInRole("*:admin") || _http.User.IsInRole("app:admin"))
                     fullAccess = true;
                 else
                     fullAccess = false;
@@ -232,7 +232,7 @@ namespace Server.Interaction
                 return clearResult.ToResult();
 
             })
-            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app.db:admin"))
+            .RequireAuthorization(policy => policy.RequireRole("*:admin", "app:admin"))
             .Produces(200)
             .WithOpenApi()
             .WithDisplayName("ClearUserSubscriptions")

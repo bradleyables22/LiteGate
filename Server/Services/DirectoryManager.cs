@@ -1,4 +1,5 @@
-﻿using System.IO.Compression;
+﻿using Server.Utilities;
+using System.IO.Compression;
 using System.Text.RegularExpressions;
 
 public static class DirectoryManager
@@ -43,21 +44,49 @@ public static class DirectoryManager
         return baseConn;
     }
 
-    public static IReadOnlyList<string> ListDatabases()
+    public static IReadOnlyList<DatabaseLookupResult> ListDatabases()
     {
         var root = GetRoot();
-        if (!Directory.Exists(root)) return Array.Empty<string>();
+        if (!Directory.Exists(root)) return Array.Empty<DatabaseLookupResult>();
 
-        var names = new List<string>();
+        var results = new List<DatabaseLookupResult>();
+
         foreach (var dir in Directory.EnumerateDirectories(root))
         {
             var name = Path.GetFileName(dir);
             if (!SafeName.IsMatch(name)) continue;
 
             var dbFile = Path.Combine(dir, $"{name}.db");
-            if (File.Exists(dbFile)) names.Add($"{name}.db");
+            if (!File.Exists(dbFile)) continue;
+
+            var walFile = dbFile + "-wal";
+            var shmFile = dbFile + "-shm";
+
+            results.Add(new DatabaseLookupResult
+            {
+                Db = $"{name}.db",
+                Db_Bytes = GetFileSizeSafe(dbFile) ?? 0,
+                Wal = File.Exists(walFile) ? $"{name}.db-wal" : null,
+                Wal_Bytes = GetFileSizeSafe(walFile),
+                Shm = File.Exists(shmFile) ? $"{name}.db-shm" : null,
+                Shm_Bytes = GetFileSizeSafe(shmFile)
+            });
         }
-        return names;
+
+        return results;
+    }
+
+    private static long? GetFileSizeSafe(string path)
+    {
+        try
+        {
+            var fi = new FileInfo(path);
+            return fi.Exists ? fi.Length : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public static bool DeleteDatabase(string dbName)
