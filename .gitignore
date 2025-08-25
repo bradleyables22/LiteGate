@@ -366,3 +366,4 @@ FodyWeavers.xsd
 /Server/Data/app.db-wal
 /TestConsole
 /TestApi
+/Server/Properties/ServiceDependencies/my-sqlite - Zip Deploy
