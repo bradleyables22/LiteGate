@@ -53,10 +53,11 @@ namespace Server.Services
                 using var conn = new SqliteConnection(_connectionString);
                 await conn.OpenAsync(ct);
                 using var cmd = conn.CreateCommand();
+
                 cmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
                 var result = await cmd.ExecuteScalarAsync(ct);
 
-                return TryResult<bool>.Pass(true);
+				return TryResult<bool>.Pass(true);
             }
             catch (Exception ex)
             {
@@ -75,6 +76,7 @@ namespace Server.Services
             {
                 using var conn = new SqliteConnection(_connectionString);
                 await conn.OpenAsync(ct);
+
                 using var cmd = conn.CreateCommand();
                 cmd.CommandText = "DELETE FROM Users WHERE Id = @UserId";
                 cmd.Parameters.AddWithValue("@UserId", userId);
@@ -218,6 +220,7 @@ namespace Server.Services
                 CREATE INDEX IF NOT EXISTS IX_Subscription_CreatedAt ON SubscriptionRecords(CreatedAt);
                 """;
                 await cmd.ExecuteNonQueryAsync(ct);
+
                 return TryResult<bool>.Pass(true);
             }
             catch (Exception ex)
@@ -238,12 +241,14 @@ namespace Server.Services
                 var newHash = PasswordHasher.HashPassword(newPlainTextPassword);
                 using var conn = new SqliteConnection(_connectionString);
                 await conn.OpenAsync(ct);
+
                 using var cmd = conn.CreateCommand();
                 cmd.CommandText = "UPDATE Users SET PasswordHash = @PasswordHash WHERE Id = @UserId";
                 cmd.Parameters.AddWithValue("@PasswordHash", newHash);
                 cmd.Parameters.AddWithValue("@UserId", userId);
 
                 var rows = await cmd.ExecuteNonQueryAsync(ct);
+
                 if (rows == 0)
                     return TryResult<bool>.Fail("User not found or password unchanged.", new Exception("No rows affected."));
 
@@ -270,6 +275,7 @@ namespace Server.Services
                 cmd.Parameters.AddWithValue("@User", userName);
 
                 var count = Convert.ToInt64(await cmd.ExecuteScalarAsync(ct));
+
                 return TryResult<bool>.Pass(count > 0);
             }
             catch (Exception ex)
@@ -301,6 +307,7 @@ namespace Server.Services
                 cmd.Parameters.AddWithValue("@RolesJson", user.RolesJson);
 
                 await cmd.ExecuteNonQueryAsync();
+
                 return TryResult<bool>.Pass(true);
             }
             catch (Exception ex)
@@ -327,8 +334,6 @@ namespace Server.Services
                 if (await reader.ReadAsync())
                     return TryResult<AppUser?>.Pass(MapUser(reader));
 
-                
-
                 return TryResult<AppUser?>.Pass(null);
             }
             catch (Exception ex)
@@ -346,10 +351,12 @@ namespace Server.Services
                 using var conn = new SqliteConnection(_connectionString);
                 await conn.OpenAsync(ct);
                 using var cmd = conn.CreateCommand();
+
                 cmd.CommandText = "UPDATE Users SET RolesJson = @RolesJson WHERE Id = @UserId";
                 cmd.Parameters.AddWithValue("@RolesJson", rolesJson);
                 cmd.Parameters.AddWithValue("@UserId", userId);
                 await cmd.ExecuteNonQueryAsync(ct);
+
                 return TryResult<bool>.Pass(true);
             }
             catch (Exception ex)
@@ -370,10 +377,12 @@ namespace Server.Services
                 using var conn = new SqliteConnection(_connectionString);
                 await conn.OpenAsync(ct);
                 using var cmd = conn.CreateCommand();
+
                 cmd.CommandText = "UPDATE Users SET DisabledAt = @DisabledAt WHERE Id = @UserId";
                 cmd.Parameters.AddWithValue("@DisabledAt", DateTime.UtcNow.ToUniversalTime().ToString("o"));
                 cmd.Parameters.AddWithValue("@UserId", userId);
                 await cmd.ExecuteNonQueryAsync(ct);
+
                 return TryResult<bool>.Pass(true);
             }
             catch (Exception ex)
@@ -394,9 +403,11 @@ namespace Server.Services
                 using var conn = new SqliteConnection(_connectionString);
                 await conn.OpenAsync(ct);
                 using var cmd = conn.CreateCommand();
+
                 cmd.CommandText = "UPDATE Users SET DisabledAt = NULL WHERE Id = @UserId";
                 cmd.Parameters.AddWithValue("@UserId", userId);
                 await cmd.ExecuteNonQueryAsync(ct);
+
                 return TryResult<bool>.Pass(true);
             }
             catch (Exception ex)
@@ -478,28 +489,27 @@ namespace Server.Services
                 await conn.OpenAsync(ct);
 
                 int totalCount;
-                using (var countCmd = conn.CreateCommand())
-                {
-                    countCmd.CommandText = "SELECT COUNT(*) FROM SubscriptionRecords;";
-                    totalCount = Convert.ToInt32(await countCmd.ExecuteScalarAsync(ct));
-                }
+                using var countCmd = conn.CreateCommand();
+                
+                countCmd.CommandText = "SELECT COUNT(*) FROM SubscriptionRecords;";
+                totalCount = Convert.ToInt32(await countCmd.ExecuteScalarAsync(ct));
+                
 
                 var items = new List<SubscriptionRecord>();
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.CommandText = """
-                        SELECT * FROM SubscriptionRecords
-                        ORDER BY CreatedAt DESC
-                        LIMIT @Take OFFSET @Skip;
+                using var cmd = conn.CreateCommand();
+                
+                cmd.CommandText = """
+                    SELECT * FROM SubscriptionRecords
+                    ORDER BY CreatedAt DESC
+                    LIMIT @Take OFFSET @Skip;
                     """;
-                    cmd.Parameters.AddWithValue("@Take", take);
-                    cmd.Parameters.AddWithValue("@Skip", skip);
+               cmd.Parameters.AddWithValue("@Take", take);
+               cmd.Parameters.AddWithValue("@Skip", skip);
 
-                    using var reader = await cmd.ExecuteReaderAsync(ct);
-                    while (await reader.ReadAsync(ct))
-                        items.Add(MapSubscription(reader));
-                }
-
+               using var reader = await cmd.ExecuteReaderAsync(ct);
+                while (await reader.ReadAsync(ct))
+                    items.Add(MapSubscription(reader));
+                
                 return OffsetTryResult<SubscriptionRecord>.Pass(totalCount, items);
             }
             catch (Exception ex)
@@ -516,30 +526,29 @@ namespace Server.Services
                 await conn.OpenAsync(ct);
 
                 int totalCount;
-                using (var countCmd = conn.CreateCommand())
-                {
-                    countCmd.CommandText = "SELECT COUNT(*) FROM SubscriptionRecords WHERE UserId = $UserId;";
-                    countCmd.Parameters.AddWithValue("$UserId", userId);
-                    totalCount = Convert.ToInt32(await countCmd.ExecuteScalarAsync(ct));
-                }
+                using var countCmd = conn.CreateCommand();
+                
+                countCmd.CommandText = "SELECT COUNT(*) FROM SubscriptionRecords WHERE UserId = $UserId;";
+                countCmd.Parameters.AddWithValue("$UserId", userId);
+                totalCount = Convert.ToInt32(await countCmd.ExecuteScalarAsync(ct));
+                
 
                 var items = new List<SubscriptionRecord>();
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.CommandText = """
-                        SELECT * FROM SubscriptionRecords
-                        WHERE UserId = @UserId
-                        ORDER BY CreatedAt DESC
-                        LIMIT @Take OFFSET @Skip;
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = """
+                    SELECT * FROM SubscriptionRecords
+                    WHERE UserId = @UserId
+                    ORDER BY CreatedAt DESC
+                    LIMIT @Take OFFSET @Skip;
                     """;
-                    cmd.Parameters.AddWithValue("@UserId", userId);
-                    cmd.Parameters.AddWithValue("@Take", take);
-                    cmd.Parameters.AddWithValue("@Skip", skip);
+                cmd.Parameters.AddWithValue("@UserId", userId);
+                cmd.Parameters.AddWithValue("@Take", take);
+                cmd.Parameters.AddWithValue("@Skip", skip);
 
-                    using var reader = await cmd.ExecuteReaderAsync(ct);
-                    while (await reader.ReadAsync(ct))
-                        items.Add(MapSubscription(reader));
-                }
+                using var reader = await cmd.ExecuteReaderAsync(ct);
+                while (await reader.ReadAsync(ct))
+                    items.Add(MapSubscription(reader));
+                
 
                 return OffsetTryResult<SubscriptionRecord>.Pass(totalCount, items);
             }
