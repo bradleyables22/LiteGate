@@ -9,6 +9,7 @@ LiteGate is a lightweight, self‑hosted HTTP API for hosting and interacting wi
 > - HMAC‑signed webhook notifications on DB changes
 > - WAL mode is **always enforced** for durability and concurrency
 > - Vacuum, checkpoint truncate, download, create, delete endpoints
+> - Both Windows and Linux compatible
 
 ---
 
