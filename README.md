@@ -31,7 +31,7 @@ On first boot, LiteGate seeds a default admin user:
 - **User**: `SuperAdmin`
 - **Password**: `ChangeDisPassword123!`
 
-Use these credentials to authenticate and obtain a JWT (see **Identity** endpoints below), then change the password.
+Use these credentials to authenticate and obtain a JWT (see **Identity** endpoints below), then change the password or (ideally) create a new user and burn the seeded account.
 
 > **Note:** LiteGate does **not** use `appsettings.json` for configuration in this build.
 
