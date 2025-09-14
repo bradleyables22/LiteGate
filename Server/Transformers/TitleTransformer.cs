@@ -8,7 +8,7 @@ namespace Server.Transformers
         public Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
         {
 
-            document.Info.Title = $"Hosted Sqlite API";
+            document.Info.Title = $"LiteGate SQlite API";
             
             return Task.FromResult(document);
         }

@@ -39,6 +39,7 @@ builder.Services.AddSingleton<Channel<SqliteChangeEvent>>(_ =>
 builder.Services.AddSingleton<UserDatabase>();
 builder.Services.AddSingleton<ServerSettings>();
 builder.Services.AddSingleton<DatabaseGateManager>();
+builder.Services.AddHostedService<SecretRotator>();
 
 builder.Services
 	.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -59,7 +60,8 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
 
 			IssuerSigningKeyResolver = (token, securityToken, kid, validationParameters) =>
 			{
-				var keyBytes = Encoding.UTF8.GetBytes(settings.Secret ?? string.Empty);
+                string secret = settings.GetSecretAsync().GetAwaiter().GetResult();
+				var keyBytes = Encoding.UTF8.GetBytes(secret ?? string.Empty);
 				return new[] { new SymmetricSecurityKey(keyBytes) };
 			}
 		};
@@ -106,7 +108,6 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddOpenApi("v1", options =>
 {
-    //this is kind of annoying to have to have, swagger did it better
     options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
     options.AddDocumentTransformer<TitleTransformer>();
 });
@@ -126,7 +127,7 @@ app.UseAuthorization();
 app.MapOpenApi("/openapi/v1.json");
 app.MapScalarApiReference(options =>
 {
-    options.Title = "Hosted Sqlite API";
+    options.Title = "LiteGate SQLite API";
     options.Theme = ScalarTheme.BluePlanet;
     options.ForceThemeMode = ThemeMode.Dark;
     options.WithDarkModeToggle(false);
@@ -135,7 +136,6 @@ app.MapScalarApiReference(options =>
 app.MapAuthEndpoints();
 app.MapUserManagementEndpoints();
 app.MapUserRoleManagementEndpoints();
-app.MapServerSettingsEndpoints();
 app.MapDatabaseManagementEndpoints();
 app.MapDatabaseInteractionEndpoints();
 app.MapWebHookEndpoints();

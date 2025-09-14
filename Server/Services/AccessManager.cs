@@ -9,8 +9,9 @@ namespace Server.Services
         private static readonly HashSet<string> RestrictedSingles = new(StringComparer.OrdinalIgnoreCase)
 		{
 			"pragma","vacuum","analyze","reindex",
-			"attach","detach","backup",
-			"begin","commit","rollback","savepoint","release"
+			"backup",
+			"attach","detach",
+			"begin","commit","rollback","savepoint","release", "app.db"
 		};
 
         private static readonly HashSet<string> WriteSingles = new(StringComparer.OrdinalIgnoreCase)
